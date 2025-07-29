@@ -20,7 +20,7 @@ In order to run our MERIT selection algorithm on your own data, **follow the exa
 In order to replicate synthetic data experiments from the paper "A Principled Approach to Randomized Selection under
 Uncertainty: Applications to Peer Review and Grant Funding", run python scripts `experiments/dataset_sims.py` (for worst-case model) and `experiments/synthetic_sims.py` (for probabilistic model.) Then, analysis of the generated data is replicable in the iPython notebooks `experiments/dataset_analysis.ipynb` and `experiments/synthetic_analysis.ipynb`.
 
-## Directory Structure
+## Useful Files
 
 - `algorithm/merit.py` — Source code implementing the MERIT algorithm
 - `experiments/dataset_sims.py` - Code to implement experiments using Swiss NSF and conference data with worst-case intervals.
