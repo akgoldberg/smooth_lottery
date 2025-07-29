@@ -13,7 +13,7 @@ Uncertainty: Applications to Peer Review and Grant Funding"](https://arxiv.org/p
 
 ### Running the MERIT Selection Algorithm
 
-In order to run our MERIT selection algorithm on your own data, **follow the example given in `Getting_Started_Example.ipynb`.**
+In order to try running the MERIT selection algorithm, **follow the example given in `Getting_Started_Example.ipynb`.** 
 
 ### Replicating Experiments
 
