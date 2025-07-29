@@ -5,7 +5,7 @@ Uncertainty: Applications to Peer Review and Grant Funding"](https://arxiv.org/p
 
 ## Getting Started
 
-1. Clone the repository.
+1. Clone the repository: run `git clone https://github.com/akgoldberg/lottery.git` in your terminal.
 2. Install python packages (run `pip install -r requirements.txt` in terminal).*
 3. Install Gurobi: MERIT uses Gurobi to efficiently solve large linear programs. Academics can obtain a license to this software for free. Please follow [instructions from Gurobi](https://www.gurobi.com/academia/academic-program-and-licenses/) to install and activate the license.
 
