@@ -18,7 +18,7 @@ In order to run MERIT on your own data, **follow the example given in `getting_s
 ### Replicating Experiments
 
 In order to replicate synthetic data experiments from the paper "A Principled Approach to Randomized Selection under
-Uncertainty: Applications to Peer Review and Grant Funding", run python scripts `experiments/dataset_sims.py` (for worst-case model) and `synthetic_sims.py` (for probabilistic model.) Then, analysis of the generated data is replicable in the iPython notebooks `experiments/dataset_analysis.ipynb` and `synthetic_analysis.ipynb`.
+Uncertainty: Applications to Peer Review and Grant Funding", run python scripts `experiments/dataset_sims.py` (for worst-case model) and `experiments/synthetic_sims.py` (for probabilistic model.) Then, analysis of the generated data is replicable in the iPython notebooks `experiments/dataset_analysis.ipynb` and `experiments/synthetic_analysis.ipynb`.
 
 ## Directory Structure
 
