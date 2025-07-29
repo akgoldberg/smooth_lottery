@@ -3,7 +3,7 @@ import gurobipy as gp
 from gurobipy import GRB
 from collections import defaultdict
 
-from helpers import prune_instance, sort_intervals, partition_intervals, postprocess_solution, evaluate_p
+from algorithm.helpers import prune_instance, sort_intervals, partition_intervals, postprocess_solution, evaluate_p
 
 def solve_instance_base(intervals, T, k, add_adversary_constraints, lex_order_p=0, verbose=True, prune=True, p_lower_bound=None, postprocess=True):
     if verbose:

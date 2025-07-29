@@ -1,12 +1,15 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import numpy as np 
 import pandas as pd
 import GPy
 import time 
 from scipy.stats import pareto
 
-from merit import solve_problem
-from helpers import swiss_nsf, top_k
-import os
+from algorithm.merit import solve_problem
+from algorithm.helpers import swiss_nsf, top_k
 
 CONFERENCE_PARAMS = {
     'n_reviewers': 1000,

@@ -18,12 +18,12 @@ In order to run MERIT on your own data, **follow the example given in `getting_s
 ### Replicating Experiments
 
 In order to replicate synthetic data experiments from the paper "A Principled Approach to Randomized Selection under
-Uncertainty: Applications to Peer Review and Grant Funding", run python scripts `dataset_sims.py` (for worst-case model) and `synthetic_sims.py` (for probabilistic model.) Then, analysis of the generated data is replicable in the iPython notebooks `dataset_analysis.ipynb` and `synthetic_analysis.ipynb`.
+Uncertainty: Applications to Peer Review and Grant Funding", run python scripts `experiments/dataset_sims.py` (for worst-case model) and `synthetic_sims.py` (for probabilistic model.) Then, analysis of the generated data is replicable in the iPython notebooks `experiments/dataset_analysis.ipynb` and `synthetic_analysis.ipynb`.
 
 ## Directory Structure
 
-- `merit.py` — Source code implementing the MERIT algorithm
-- `dataset_sims.py` - Code to implement experiments using Swiss NSF and conference data with worst-case intervals.
-- `synthetic_sims.py` - Code to implement experiments on fully synthetic data under linear miscalibration model.
+- `algorithm/merit.py` — Source code implementing the MERIT algorithm
+- `experiments/dataset_sims.py` - Code to implement experiments using Swiss NSF and conference data with worst-case intervals.
+- `experiments/synthetic_sims.py` - Code to implement experiments on fully synthetic data under linear miscalibration model.
 - `data/SwissNSFData/` — All code to obtain Swiss NSF dataset
 - `data/ConferenceReviewData/` — All code to obtain conference data (ICLR 2025 and NeurIPS 2024)

@@ -1,8 +1,8 @@
 import numpy as np
 import cvxpy as cp
-from helpers import get_symmetric_intervals, partition_intervals, prune_instance
-from merit import separation_oracle
-from full_LP import solve_instance_ordered
+from algorithm.helpers import get_symmetric_intervals, partition_intervals, prune_instance
+from algorithm.merit import separation_oracle
+from algorithm.full_LP import solve_instance_ordered
 import time
 
 import gurobipy as gp

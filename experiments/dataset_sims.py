@@ -1,9 +1,14 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from generate_intervals import *
-from merit import solve_problem, solve_with_monotonicity
-from helpers import swiss_nsf, top_k
+from algorithm.merit import solve_problem, solve_with_monotonicity
+from algorithm.helpers import swiss_nsf, top_k
 import time 
 import json
 import pickle     
+
 
 def run_and_save_results(x, intervals, k, filename, run_monotonicity=False):
     """

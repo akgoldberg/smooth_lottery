@@ -1,7 +1,7 @@
 import gurobipy as gp
 from gurobipy import GRB
 import numpy as np
-from helpers import prune_instance, partition_intervals, get_symmetric_intervals, verify_monotonicity_in_k
+from .helpers import prune_instance, partition_intervals, get_symmetric_intervals, verify_monotonicity_in_k
 import time
 
 #######################################################################
