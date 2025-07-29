@@ -7,7 +7,7 @@ Uncertainty: Applications to Peer Review and Grant Funding"](https://arxiv.org/p
 
 1. **Clone the repository**: run `git clone https://github.com/akgoldberg/lottery.git` in your terminal.
 2. **Install python packages** (`cd` into the `lottery/` directory and run `pip install -r requirements.txt`).*
-3. **Try running the MERIT selection algorithm**: test that your setup worked, by walking through an example of running the MERIT selection algorithm in the Jupyter notebook **`Getting_Started_Example.ipynb`.**
+3. **Try running the MERIT selection algorithm**: test that your setup worked by walking through an example of running the MERIT selection algorithm in the Jupyter notebook **`Getting_Started_Example.ipynb`.**
 4. **Install Gurobi software (if needed)**: our MERIT algorithm uses [Gurobi software](https://www.gurobi.com/) to efficiently solve large linear programs. The installation in step (2) gives you a trial license that can be used to solve smaller problems (for example, selecting among a few hundred candidates.) If you run the code on a larger problem instance, you will likely encounter an error "Model too large for size-limited Gurobi license." If this occurs, please obtain Gurobi with a non-trial license. Academics can obtain a license to this software for free. Follow [instructions from Gurobi](https://www.gurobi.com/academia/academic-program-and-licenses/) to install and activate the license.
 
 *Note: to replicate our synthetic data experiments you will additionally need to install the Python pacakges `cvxpy` and `GPy`, but these are not necessary to run MERIT.
