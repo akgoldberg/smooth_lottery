@@ -1,6 +1,6 @@
 # Randomized Selection under Uncertainty (Peer Review Lottery)
 
-This directory contains code to implement and evaluate methods for randomized selection (peer review lotteries) based on our paper ["A Principled Approach to Randomized Selection under
+This directory contains Python code to implement and evaluate methods for randomized selection (peer review lotteries) based on our paper ["A Principled Approach to Randomized Selection under
 Uncertainty: Applications to Peer Review and Grant Funding"](https://arxiv.org/pdf/2506.19083).
 
 ## Getting Started
@@ -13,7 +13,7 @@ Uncertainty: Applications to Peer Review and Grant Funding"](https://arxiv.org/p
 
 ### Running the MERIT Selection Algorithm
 
-In order to run MERIT on your own data, **follow the example given in `getting_started_example.ipynb`.**
+In order to run our MERIT selection algorithm on your own data, **follow the example given in `getting_started_example.ipynb`.**
 
 ### Replicating Experiments
 
