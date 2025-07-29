@@ -284,3 +284,41 @@ def verify_monotonicity_in_k(pseq, raise_error=False, print_out=True):
         print('Valid solution: p is monotonic in k.')
     return True
 
+def mean_interval_overlaps(intervals):
+    """
+    Given a list of intervals (tuples of the form (start, end)),
+    compute the average number of other intervals that each interval overlaps with.
+    """
+    n = len(intervals)
+    if n <= 1:
+        return 0.0  # No overlaps possible
+    
+    overlaps = [0] * n
+
+    for i in range(n):
+        a_start, a_end = intervals[i]
+        for j in range(n):
+            if i == j:
+                continue
+            b_start, b_end = intervals[j]
+            if a_start < b_end and b_start < a_end:  # strict overlap condition
+                overlaps[i] += 1
+
+    return sum(overlaps) / n
+
+def normalize_intervals(intervals):
+    """
+    Normalize a list of intervals so that they all lie in [0,1].
+    """
+    min_val = min(interval[0] for interval in intervals)
+    max_val = max(interval[1] for interval in intervals)
+
+    if min_val == max_val:
+        return [(0, 1)] * len(intervals)  # All intervals are the same point
+
+    normalized_intervals = [
+        ((interval[0] - min_val) / (max_val - min_val), (interval[1] - min_val) / (max_val - min_val))
+        for interval in intervals
+    ]
+    
+    return normalized_intervals

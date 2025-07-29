@@ -178,3 +178,6 @@ def generate_fixedwidth_intervals(n, width, M=10):
         b = np.round(x + width/2, 5)
         intervals.append((a,b))
     return sorted(intervals, reverse=True) # sort by left endpoint
+
+
+0.0624577485191862
