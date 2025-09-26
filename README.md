@@ -7,19 +7,19 @@ Uncertainty: Applications to Peer Review and Grant Funding"](https://arxiv.org/p
 
 1. **Clone the repository**: run `git clone https://github.com/akgoldberg/lottery.git` in your terminal.
 2. **Install python packages** (`cd` into the `lottery/` directory and run `pip install -r requirements.txt`).*
-3. **Try running the MERIT selection algorithm**: test that your setup worked by walking through an example of running the MERIT selection algorithm in the Jupyter notebook **`Getting_Started_Example.ipynb`.** If you are unfamiliar with Jupyter notebook, follow instructions [here](https://jupyter.org/install) to install and get started.
-4. **Install Gurobi software (if needed)**: our MERIT algorithm uses [Gurobi software](https://www.gurobi.com/) to efficiently solve large linear programs. The installation in step (2) gives you a trial license that can be used to solve smaller problems (for example, selecting among a few hundred candidates.) If you run the code on a larger problem instance, you will likely encounter an error "Model too large for size-limited Gurobi license." If this occurs, please obtain Gurobi with a non-trial license. Academics can obtain a license to this software for free. Follow [instructions from Gurobi](https://www.gurobi.com/academia/academic-program-and-licenses/) to install and activate the license.
+3. **Try running the MERIT selection algorithm**: test that your setup worked by walking through an example of running the MERIT selection algorithm in the notebook **`Getting_Started_Example.ipynb`.** If you are unfamiliar with Jupyter notebooks, follow instructions [here](https://jupyter.org/install) to install and get started.
+4. **Install Gurobi software (only as needed to solve large problems)**: our MERIT algorithm uses [Gurobi software](https://www.gurobi.com/) to efficiently solve large linear programs. The installation in step (2) gives you a trial license that can be used to solve smaller problems (for example, selecting among a few hundred candidates.) If you run the code on a larger problem instance, you will likely encounter an error "Model too large for size-limited Gurobi license." If this occurs, please obtain Gurobi with a non-trial license. Academics can obtain a license to this software for free. Follow [instructions from Gurobi](https://www.gurobi.com/academia/academic-program-and-licenses/) to install and activate the license.
 
 *Note: to replicate our synthetic data experiments you will additionally need to install the Python pacakges `cvxpy` and `GPy`, but these are not necessary to run MERIT.
 
 ### Running the MERIT Selection Algorithm
 
-In order to try running the MERIT selection algorithm, **follow the example given in the Jupyter notebook `Getting_Started_Example.ipynb`.** 
+In order to try running the MERIT selection algorithm, **follow the example given in the Jupyter notebook `Getting_Started_Example.ipynb`.** This is a good template to replace with your own data (your own interval estimates of candidate quality.)
 
 ### Replicating Experiments
 
 In order to replicate synthetic data experiments from the paper "A Principled Approach to Randomized Selection under
-Uncertainty: Applications to Peer Review and Grant Funding", run python scripts `experiments/dataset_sims.py` (for worst-case model) and `experiments/synthetic_sims.py` (for probabilistic model.) Then, analysis of the generated data is replicable in the iPython notebooks `experiments/dataset_analysis.ipynb` and `experiments/synthetic_analysis.ipynb`.
+Uncertainty: Applications to Peer Review and Grant Funding", run python scripts `experiments/dataset_sims.py` (for worst-case model) and `experiments/synthetic_sims.py` (for probabilistic model.) Then, analysis of the generated data is replicable in the notebooks `experiments/dataset_analysis.ipynb` and `experiments/synthetic_analysis.ipynb`.
 
 ## Useful Files
 
