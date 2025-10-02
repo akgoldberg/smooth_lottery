@@ -31,7 +31,7 @@ def separation_oracle(p_vals, v_val, intervals, k, tol=1e-6, max_cuts_per_iter=N
     return cuts
 
 # Cutting plane optimization method
-def cutting_plane_optimization(intervals, k, p_lower_bound,
+def cutting_plane_optimization(intervals, k, p_lower_bound, uniform_lottery,
                                 use_symmetry, add_monotonicity_constraints,
                                 max_iters, max_cuts_per_iter, tol, drop_cut_limit,
                                 verbose, print_iter):   
@@ -89,6 +89,37 @@ def cutting_plane_optimization(intervals, k, p_lower_bound,
         if verbose:
             print(f'Added initial monotonicity constraints: {n_mono_constraints} from {n_chains} chains.')
     timing_info['monotonicity_constraints_setup'] = time.time() - step_start
+
+    # (C) If uniform lottery, add integer variables and constraints
+    step_start = time.time()
+    if uniform_lottery:
+        # Add variables for a_i, r_i, c, w_i
+        a = m.addVars(n_vars, vtype=GRB.BINARY, name="a") # a_i = indicator is 1 if i is always selected
+        r = m.addVars(n_vars, vtype=GRB.BINARY, name="r") # r_i = indicator is 1 if i is entered into the lottery
+        c = m.addVar(vtype=GRB.CONTINUOUS, lb=0, ub=1, name="c") # c = uniform probability of winning the lottery
+        w = m.addVars(n_vars, vtype=GRB.CONTINUOUS, lb=0, ub=1, name="w") # w_i = c if i is in the lottery, 0 otherwise
+
+        # a_i + r_i <= 1 (either accepted, in lottery, or rejected)
+        m.addConstrs((a[i] + r[i] <= 1 for i in range(n_vars)), name="a_plus_r_leq_1") 
+
+        # p_i = a_i + r_i (probability is sum of always accepted and lottery prob)
+        m.addConstrs((p[i] == a[i] + w[i] for i in range(n_vars)), name="p_eq_a_plus_r")
+
+        # w_i <= c (weight in lottery cannot exceed uniform probability)
+        m.addConstrs((w[i] <= c for i in range(n_vars)), name="w_leq_c")
+
+        # w_i >= c - (1 - r_i) (if in lottery, weight is c)
+        m.addConstrs((w[i] >= c - (1 - r[i]) for i in range(n_vars)), name="w_geq_c_minus_1_minus_r")
+
+        # w_i <= r_i (if not in lottery, weight is 0)
+        m.addConstrs((w[i] <= r[i] for i in range(n_vars)), name="w_leq_r")
+
+        # a_i >= r_j for all i, j such that intervals[i][0] > intervals[j][1] (ex post validity constraints)
+        for i in range(n_vars):
+            for j in range(n_vars):
+                if intervals[i][0] > intervals[j][1]:
+                    m.addConstr(a[i] >= r[j], name=f"a_geq_r_dom_{i}_{j}")
+    timing_info['uniform_lottery_setup'] = time.time() - step_start
 
     total_cuts = 0
     current_cuts = 0
@@ -149,7 +180,7 @@ def cutting_plane_optimization(intervals, k, p_lower_bound,
                             'n_mono_constraints': n_mono_constraints,
                             'timing': timing_info}
 
-def solve_problem(intervals, k, set_p_lower_bound=None, sort_by_left=True,
+def solve_problem(intervals, k, uniform_lottery=False, set_p_lower_bound=None, sort_by_left=True,
                     init_prune=True, use_symmetry=True, add_monotonicity_constraints=True, 
                     max_iters=1000, tol=1e-6, max_cuts_per_iter=None, drop_cut_limit=3, print_iter=10, verbose=False):
     
@@ -205,7 +236,7 @@ def solve_problem(intervals, k, set_p_lower_bound=None, sort_by_left=True,
     timing_info['init_prune_time'] = time.time() - step_time
 
     # (2) optimize using cutting plane method
-    p_vals, v_val, info = cutting_plane_optimization(intervals_pruned, k_pruned, p_lower_bound_pruned,
+    p_vals, v_val, info = cutting_plane_optimization(intervals_pruned, k_pruned, p_lower_bound_pruned, uniform_lottery,
                                                         use_symmetry, add_monotonicity_constraints,
                                                         max_iters, max_cuts_per_iter, tol, drop_cut_limit,
                                                         verbose, print_iter)
@@ -229,7 +260,7 @@ def solve_problem(intervals, k, set_p_lower_bound=None, sort_by_left=True,
 
     return p_out, v_out, info
 
-def solve_with_monotonicity(intervals, k, max_iters=1000, max_cuts_per_iter=None, drop_cut_limit=3,
+def solve_with_monotonicity(intervals, k, uniform_lottery=False, max_iters=1000, max_cuts_per_iter=None, drop_cut_limit=3,
                                 print_iter=10, verbose=False, check_monotonicity=True):
     
     p_seq = []
@@ -240,7 +271,7 @@ def solve_with_monotonicity(intervals, k, max_iters=1000, max_cuts_per_iter=None
     for i in range(1,k+1):
         print('Solving with n_selected =', i)  
         # solve with n_selected = i
-        p,v,info  = solve_problem(intervals, i, set_p_lower_bound=p_lower_bound,
+        p,v,info  = solve_problem(intervals, i, uniform_lottery=uniform_lottery, set_p_lower_bound=p_lower_bound,
                                     sort_by_left=True, init_prune=False, use_symmetry=True,
                                     add_monotonicity_constraints=True,
                                     max_iters=max_iters, tol=1e-6, max_cuts_per_iter=max_cuts_per_iter,
@@ -341,7 +372,7 @@ def verify_sampling(n, k, p, num_trials=10_000):
 ##                              Full Algorithm                       ##
 #######################################################################
 
-def run_merit(intervals, k, enforce_monotonicity=False):
+def run_merit(intervals, k, enforce_monotonicity=False, uniform_lottery=False):
     """
     Run the MERIT algorithm on the given intervals and k.
     
@@ -349,6 +380,7 @@ def run_merit(intervals, k, enforce_monotonicity=False):
     - intervals: List of tuples (low, high) representing the intervals.
     - k: Number of items to select.
     - enforce_monotonicity: If True, enforce monotonicity in budget (may lead to loss of optimality).
+    - uniform_lottery: If True, enforce a uniform lottery (equal probabilities for all items subject to randomization).
     
     Returns:
     - p: List of selection probabilities for each item.
@@ -359,10 +391,12 @@ def run_merit(intervals, k, enforce_monotonicity=False):
        p_seq, _, _ = solve_with_monotonicity(intervals, k)
        p = p_seq[-1]  # Last sequence corresponds to k
     else:
-        p, v, info = solve_problem(intervals, k)
+        p, v, info = solve_problem(intervals, k, uniform_lottery=uniform_lottery)
     
-    # Post-process the solution to ensure ex post validity
-    p = postprocess_solution(p, intervals)
+    # Post-process the solution to ensure ex post validity 
+    # (if not a uniform lottery, where ex post validity is guaranteed by optimization problem)
+    if not uniform_lottery:
+        p = postprocess_solution(p, intervals)
 
     selected_items = systematic_sampling(k, p)
     return p, selected_items
