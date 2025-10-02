@@ -32,3 +32,4 @@ build/
 *.RData
 *.png 
 res/
+selection_probabilities.csv
