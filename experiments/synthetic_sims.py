@@ -384,6 +384,8 @@ def run_miscalibration_simulation(n_items, n_reviewers, items_per_rev, error_par
             p_raw_deterministic_median = top_k(raw_medians, k)
             p_merit,_,_ = solve_problem(intervals50, k)
             p_swiss = np.array(swiss_nsf(intervals50, er, k))
+            # Merit with uniform lottery
+            p_merit_unif, _, _ = solve_problem(intervals50, k, uniform_lottery=True)
             
             # get % total quality of each method
             p_quality_er_deterministic = np.dot(theta, p_er_deterministic) / total_quality
@@ -391,6 +393,7 @@ def run_miscalibration_simulation(n_items, n_reviewers, items_per_rev, error_par
             p_quality_raw_deterministic_median = np.dot(theta, p_raw_deterministic_median) / total_quality
             p_quality_merit = np.dot(theta, p_merit) / total_quality
             p_quality_swiss = np.dot(theta, p_swiss) / total_quality
+            p_quality_merit_unif = np.dot(theta, p_merit_unif) / total_quality
             
             # get % of true top k items selected
             prec_er_deterministic = np.dot(p_top_k, p_er_deterministic) / k
@@ -398,10 +401,12 @@ def run_miscalibration_simulation(n_items, n_reviewers, items_per_rev, error_par
             prec_raw_deterministic_median = np.dot(p_top_k, p_raw_deterministic_median) / k
             prec_merit = np.dot(p_top_k, p_merit) / k
             prec_swiss = np.dot(p_top_k, p_swiss) / k
+            prec_merit_unif = np.dot(p_top_k, p_merit_unif) / k
 
             # save % randomized (p > 0 and p < 1)
             n_rand_swiss = np.sum((p_swiss > 0) & (p_swiss < 1))
             n_rand_merit = np.sum((p_merit > 0) & (p_merit < 1))
+            n_rand_merit_unif = np.sum((p_merit_unif > 0) & (p_merit_unif < 1))
 
             if prec_merit - prec_swiss >= 0.1:
                 print(f"Interesting: Merit and Swiss methods differ by more than 0.1 in precision for k={k} in iteration {iter + 1}")
@@ -421,19 +426,17 @@ def run_miscalibration_simulation(n_items, n_reviewers, items_per_rev, error_par
             results.append([
                 iter, n_reviewers, n_items, items_per_rev, error_type,
                 k, intervals50_width, est_params,
-                n_rand_swiss, n_rand_merit,
-                # p_top_k, p_er_deterministic, p_raw_deterministic, p_raw_deterministic_median, p_merit, p_swiss,
-                p_quality_er_deterministic, p_quality_raw_deterministic, p_quality_raw_deterministic_median, p_quality_merit, p_quality_swiss, 
-                prec_er_deterministic, prec_raw_deterministic, prec_raw_deterministic_median, prec_merit, prec_swiss
+                n_rand_swiss, n_rand_merit, n_rand_merit_unif,
+                p_quality_er_deterministic, p_quality_raw_deterministic, p_quality_raw_deterministic_median, p_quality_merit, p_quality_swiss, p_quality_merit_unif,
+                prec_er_deterministic, prec_raw_deterministic, prec_raw_deterministic_median, prec_merit, prec_swiss, prec_merit_unif
             ])
 
     d = pd.DataFrame(results, columns=[
         'iter', 'n_reviewers', 'n_items', 'items_per_rev', 'error_type',
         'k', 'er_interval_mean_width', 'estimated_params',
-        'n_rand_swiss', 'n_rand_merit',
-        # 'p_top_k', 'p_er_deterministic', 'p_raw_deterministic', 'p_raw_deterministic_median', 'p_merit', 'p_swiss',
-        'prec_quality_er_deterministic', 'prec_quality_raw_deterministic', 'prec_quality_raw_deterministic_median', 'prec_quality_merit', 'prec_quality_swiss',
-        'prec_er_deterministic', 'prec_raw_deterministic', 'prec_raw_deterministic_median', 'prec_merit', 'prec_swiss'
+        'n_rand_swiss', 'n_rand_merit', 'n_rand_merit_unif',
+        'prec_quality_er_deterministic', 'prec_quality_raw_deterministic', 'prec_quality_raw_deterministic_median', 'prec_quality_merit', 'prec_quality_swiss', 'prec_quality_merit_unif',
+        'prec_er_deterministic', 'prec_raw_deterministic', 'prec_raw_deterministic_median', 'prec_merit', 'prec_swiss', 'prec_merit_unif'
     ])
 
     # add error_params to DataFrame
@@ -663,30 +666,30 @@ if __name__ == "__main__":
     df = run_linear_miscalibration_sims('sigma_b', [0.0, 0.5, 1.0, 2.0, 4.0], PARAMS=SWISS_NSF_PARAMS)
     df.to_csv('res/simulation_results/linear_miscalibration_results_swissnsfparams.csv', index=False)
 
-    df = run_linear_miscalibration_sims('sigma_a', [0.0, 0.5, 1.0, 2.0, 4.0], PARAMS=SWISS_NSF_PARAMS)
-    df.to_csv('res/simulation_results/linear_miscalibration_results_swissnsfparams_misspecified_sigmaa.csv', index=False)
+    # df = run_linear_miscalibration_sims('sigma_a', [0.0, 0.5, 1.0, 2.0, 4.0], PARAMS=SWISS_NSF_PARAMS)
+    # df.to_csv('res/simulation_results/linear_miscalibration_results_swissnsfparams_misspecified_sigmaa.csv', index=False)
 
     df = run_linear_miscalibration_sims('sigma_b', [0.0, 0.5, 1.0, 2.0, 4.0], PARAMS=CONFERENCE_PARAMS, n_trials=10)
     df.to_csv('res/simulation_results/linear_miscalibration_results_conferenceparams.csv', index=False)
 
-    df = run_linear_miscalibration_sims('sigma_a', [0.0, 0.5, 1.0, 2.0, 4.0], PARAMS=CONFERENCE_PARAMS, n_trials=10)
-    df.to_csv('res/simulation_results/linear_miscalibration_results_conferenceparams_misspecified_sigmaa.csv', index=False)
+    # df = run_linear_miscalibration_sims('sigma_a', [0.0, 0.5, 1.0, 2.0, 4.0], PARAMS=CONFERENCE_PARAMS, n_trials=10)
+    # df.to_csv('res/simulation_results/linear_miscalibration_results_conferenceparams_misspecified_sigmaa.csv', index=False)
 
-    ### Run simulations for risky bias
-    df = run_riskybias_sims(vary_param='p_bias', param_values=np.arange(0.0, 1.0, 0.1), PARAMS=SWISS_NSF_PARAMS)
-    df.to_csv('res/simulation_results/riskybias_swissnsf_pbias.csv', index=False)
+    # ### Run simulations for risky bias
+    # df = run_riskybias_sims(vary_param='p_bias', param_values=np.arange(0.0, 1.0, 0.1), PARAMS=SWISS_NSF_PARAMS)
+    # df.to_csv('res/simulation_results/riskybias_swissnsf_pbias.csv', index=False)
 
-    df = run_riskybias_sims(vary_param='sigma_err', param_values=[0.0, 0.5, 1.0, 2.0, 4.0], PARAMS=SWISS_NSF_PARAMS)
-    df.to_csv('res/simulation_results/riskybias_swissnsf_sigma_err.csv', index=False)
+    # df = run_riskybias_sims(vary_param='sigma_err', param_values=[0.0, 0.5, 1.0, 2.0, 4.0], PARAMS=SWISS_NSF_PARAMS)
+    # df.to_csv('res/simulation_results/riskybias_swissnsf_sigma_err.csv', index=False)
 
-    df = run_riskybias_sims(vary_param='alpha', param_values=[1.0, 1.25, 1.5, 2.0, 4.0],PARAMS=SWISS_NSF_PARAMS)
-    df.to_csv('res/simulation_results/riskybias_swissnsf_alpha.csv', index=False)
+    # df = run_riskybias_sims(vary_param='alpha', param_values=[1.0, 1.25, 1.5, 2.0, 4.0],PARAMS=SWISS_NSF_PARAMS)
+    # df.to_csv('res/simulation_results/riskybias_swissnsf_alpha.csv', index=False)
 
-    df = run_riskybias_sims(vary_param='p_bias', param_values=np.arange(0.0, 1.0, 0.1), PARAMS=CONFERENCE_PARAMS)
-    df.to_csv('res/simulation_results/riskybias_conference_pbias.csv', index=False)
+    # df = run_riskybias_sims(vary_param='p_bias', param_values=np.arange(0.0, 1.0, 0.1), PARAMS=CONFERENCE_PARAMS)
+    # df.to_csv('res/simulation_results/riskybias_conference_pbias.csv', index=False)
 
-    df = run_subjective_score_sims(vary_param='prob_conflict', param_values=np.arange(0.0, 1.0, 0.1), PARAMS=SWISS_NSF_PARAMS, n_trials=100)
-    df.to_csv('res/simulation_results/subjective_scores_swissnsf_prob_conflict.csv', index=False)
+    # df = run_subjective_score_sims(vary_param='prob_conflict', param_values=np.arange(0.0, 1.0, 0.1), PARAMS=SWISS_NSF_PARAMS, n_trials=100)
+    # df.to_csv('res/simulation_results/subjective_scores_swissnsf_prob_conflict.csv', index=False)
 
-    df = run_subjective_score_sims(vary_param='prob_conflict', param_values=np.arange(0.0, 1.0, 0.1), PARAMS=CONFERENCE_PARAMS, n_trials=100)
-    df.to_csv('res/simulation_results/subjective_scores_conference_prop_expert.csv', index=False)
+    # df = run_subjective_score_sims(vary_param='prob_conflict', param_values=np.arange(0.0, 1.0, 0.1), PARAMS=CONFERENCE_PARAMS, n_trials=100)
+    # df.to_csv('res/simulation_results/subjective_scores_conference_prop_expert.csv', index=False)

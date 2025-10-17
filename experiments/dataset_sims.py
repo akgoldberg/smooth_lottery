@@ -15,6 +15,7 @@ def run_and_save_results(x, intervals, k, filename, run_monotonicity=False):
     Run the cutting plane algorithm and save results to a file.
     """
     p_opt, v_opt, info = solve_problem(intervals, k, verbose=True)
+    p_opt_uniform, v_opt_uniform, info_uniform = solve_problem(intervals, k, uniform_lottery=True, verbose=True)
     if run_monotonicity:
         p_seq, v_seq, info_seq = solve_with_monotonicity(intervals, k, verbose=False)
     p_swiss_seq = [swiss_nsf(intervals, x, i) for i in range(1,k+1)]
@@ -27,7 +28,10 @@ def run_and_save_results(x, intervals, k, filename, run_monotonicity=False):
             'v_opt': v_opt,
             'info': info,
             'p_swiss': p_swiss_seq,
-            'top_k': p_top_k
+            'top_k': p_top_k,
+            'p_opt_uniform': p_opt_uniform,
+            'v_opt_uniform': v_opt_uniform,
+            'info_uniform': info_uniform
         }
         if run_monotonicity:
             results.update({
@@ -250,9 +254,9 @@ def run_data_ablations(data):
 if __name__ == "__main__":
     print('===========Running All Case Studies===========')
     run_case_studies()
-    for i in range(10):
-        print(f'===========Running Iteration {i} for Computation Tests===========')
-        run_case_studies(computation_test=True, iter=i)
+    # for i in range(10):
+    #     print(f'===========Running Iteration {i} for Computation Tests===========')
+    #     run_case_studies(computation_test=True, iter=i)
 
-    print('===========Running Ablations===========')
-    run_data_ablations('neurips')
+    # print('===========Running Ablations===========')
+    # run_data_ablations('neurips')

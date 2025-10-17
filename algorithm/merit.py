@@ -128,13 +128,16 @@ def cutting_plane_optimization(intervals, k, p_lower_bound, uniform_lottery,
         m.optimize()
 
         if (drop_cut_limit is not None) and (current_cuts > drop_cut_limit*n_vars):
-            # only keep cut constraints with drop_cut_limit * n_vars smallest slack values
-            cut_slacks = [c.Slack for c in m.getConstrs() if c.ConstrName == "cut"]
-            cutoff = sorted(cut_slacks)[drop_cut_limit*n_vars]
-            for c in m.getConstrs():
-                if c.ConstrName == "cut" and c.Slack > cutoff:
-                    m.remove(c)
-                    current_cuts -= 1
+            if total_cuts > current_cuts * 10: # heuristic to not drop cuts if optimization is stuck
+                pass
+            else:
+                # only keep cut constraints with drop_cut_limit * n_vars smallest slack values
+                cut_slacks = [c.Slack for c in m.getConstrs() if c.ConstrName == "cut"]
+                cutoff = sorted(cut_slacks)[drop_cut_limit*n_vars]
+                for c in m.getConstrs():
+                    if c.ConstrName == "cut" and c.Slack > cutoff:
+                        m.remove(c)
+                        current_cuts -= 1
                     
         if m.status != GRB.OPTIMAL:
             raise ValueError("Problem is infeasible or unbounded")
