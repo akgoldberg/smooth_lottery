@@ -397,6 +397,10 @@ def run_merit(intervals, k, enforce_monotonicity=False, uniform_lottery=False):
     - selected_items: List of indices of selected items.
     """
     
+    # randomly permute intervals to avoid any bias from input ordering
+    perm = np.random.permutation(len(intervals))
+    intervals = [intervals[i] for i in perm]
+
     if enforce_monotonicity:
        p_seq, _, _ = solve_with_monotonicity(intervals, k)
        p = p_seq[-1]  # Last sequence corresponds to k
@@ -409,4 +413,12 @@ def run_merit(intervals, k, enforce_monotonicity=False, uniform_lottery=False):
         p = postprocess_solution(p, intervals)
 
     selected_items = systematic_sampling(k, p)
+
+    # Reorder p and selected_items to original order
+    p_original_order = np.zeros(len(p))
+    for i, index in enumerate(perm):
+        p_original_order[index] = p[i]
+    p = p_original_order
+    selected_items = [perm[i] for i in selected_items]
+    
     return p, selected_items
