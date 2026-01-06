@@ -235,9 +235,9 @@ def plot_intervals(intervals, order=None, x=None,
 #                           Verify Axioms                             #
 #######################################################################
 
-# Given a list of intervals and a p vector, verify that the solution is post-hoc valid.
+# Given a list of intervals and a p vector, verify that the solution is ex-post valid.
 # This means that if i dominates j, then either p_i = 1 or p_j = 0.
-def verify_posthoc_validity(intervals, p, raise_error=False):
+def verify_expost_validity(intervals, p, raise_error=False):
     items = list(zip(p, intervals, range(len(p))))
     
     # Sort items by ascending order of UCB

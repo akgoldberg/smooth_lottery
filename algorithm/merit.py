@@ -297,9 +297,10 @@ def solve_with_monotonicity(intervals, k, uniform_lottery=False, max_iters=1000,
 def postprocess_solution(p, intervals):
     items = list(zip(p, intervals, range(len(p))))
     
-    # Sort items by ascending order of p
-    items.sort(key=lambda x: x[0])
-    
+    # Sort items by ascending order of UB, breaking ties in ascending order of LB
+    np.random.shuffle(items)
+    items.sort(key=lambda x: (x[1][1], x[1][0]))
+
     # Extract the sorted probabilities, intervals, and original indices
     sorted_p, sorted_intervals, original_indices = zip(*items)
     
