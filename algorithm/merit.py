@@ -297,8 +297,7 @@ def solve_with_monotonicity(intervals, k, uniform_lottery=False, max_iters=1000,
 def postprocess_solution(p, intervals):
     items = list(zip(p, intervals, range(len(p))))
     
-    # Sort items by ascending order of UB, breaking ties in ascending order of LB
-    np.random.shuffle(items)
+    # Sort items by ascending order of UB
     items.sort(key=lambda x: (x[1][1], x[1][0]))
 
     # Extract the sorted probabilities, intervals, and original indices
@@ -323,6 +322,13 @@ def postprocess_solution(p, intervals):
     adjusted_p = [0] * n
     for i, index in enumerate(original_indices):
         adjusted_p[index] = sorted_p[i]
+
+    # Set the probability within each symmetric partition to the average probability
+    sym_intervals = get_symmetric_intervals(intervals)
+    for group in sym_intervals: # get group of intervals that all have the same dominance constraints
+        avg_p = np.mean([adjusted_p[i] for i in group])
+        for i in group:
+            adjusted_p[i] = avg_p
     
     return adjusted_p
 
