@@ -34,3 +34,8 @@ build/
 *.png 
 res/
 selection_probabilities.csv
+
+# Context for agent
+paper.tex
+CLAUDE.md
+AGENT.md

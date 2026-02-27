@@ -6,7 +6,8 @@ L-smoothness guarantee (Definition 1):
 
 Parameter choices:
   Linear Lottery : w   = L / (2 * D_v)   [Theorem 1]
-  Top-k Softmax  : tau = 2 * D_v / (e*L) [Theorem 4]
+  Top-k Softmax  : tau = 2 * D_v / (e*L) [Theorem 4, k >= 2]
+                   tau = D_v / (2*L)      [k = 1, sharper constant]
 
 All mechanism functions return (p, sample).
 For softmax p is estimated via Monte Carlo, for linear lottery p is exact.
@@ -137,9 +138,7 @@ def softmax_topk(
     gumbel = -tau * np.log(-np.log(np.clip(U, 1e-10, 1.0 - 1e-10)))
 
     topk_idx = np.argpartition(v[np.newaxis, :] + gumbel, -k, axis=1)[:, -k:]
-    counts = np.zeros(n)
-    for row in topk_idx:
-        counts[row] += 1
+    counts = np.bincount(topk_idx.ravel(), minlength=n).astype(float)
 
     p = counts / n_samples
     p = p / p.sum() * k  # enforce budget exactly
@@ -155,7 +154,9 @@ def softmax_topk_smooth(
     rng: Optional[np.random.Generator] = None,
 ) -> tuple:
     """
-    Top-k Softmax with tau = 2 * D_v / (e * L), guaranteeing L-smoothness (Theorem 4).
+    Top-k Softmax temperature for L-smoothness:
+    - k = 1: tau = D_v / (2 * L) (sharper constant for standard softmax)
+    - k >= 2: tau = 2 * D_v / (e * L) (Theorem 4)
 
     Returns (p, sample).
     """
@@ -163,7 +164,11 @@ def softmax_topk_smooth(
         raise ValueError("L must be positive")
     if D_v <= 0:
         raise ValueError("D_v must be positive")
-    return softmax_topk(v, k, tau=2.0 * D_v / (math.e * L), n_samples=n_samples, rng=rng)
+    if k == 1:
+        tau = D_v / (2.0 * L) # from tight bound in k=1
+    else:
+        tau = 2.0 * D_v / (math.e * L)
+    return softmax_topk(v, k, tau=tau, n_samples=n_samples, rng=rng)
 
 
 if __name__ == "__main__":
