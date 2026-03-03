@@ -11,7 +11,7 @@ python experiments/smoothness.py \
   --softmax-search-samples 5000 \
   --softmax-final-samples 50000
 
-python experiments/local_smoothness.py \
+python experiments/local_sensitivity.py \
   --k_names k10pct,k33pct,k50pct \
   --L_values 0.2,0.4,0.6,0.8,1.0 \
   --softmax_search_samples 800 \
@@ -23,4 +23,4 @@ python experiments/baseline_local_sensitivity.py \
   --swiss_candidate_window -1 \
   --threshold_candidate_window -1
 
-echo "Regret, utility CCDF, global/local smoothness, and baseline local sensitivity experiments complete. See experiments/results and experiments/figures."
+echo "Regret, utility CCDF, global smoothness, local sensitivity, and baseline local sensitivity experiments complete. See experiments/results and experiments/figures."

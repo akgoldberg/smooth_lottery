@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
-"""Worst-case local sensitivity for existing baseline partial-lottery mechanisms.
+"""Local sensitivity experiment for baseline partial lotteries and smooth mechanisms.
 
-Baselines:
+Purpose:
+- Estimate worst-case local sensitivity under one-review one-tick perturbations.
+- Compare existing baseline partial lotteries against Linear Lottery and Softmax.
+
+Mechanisms:
 - MERIT (interval LP)
 - Swiss NSF interval rule
 - Randomize-above-threshold
+- Linear Lottery (L=1/r)
+- Softmax (L=1/r; paired-noise Monte Carlo estimate)
 
-No Monte Carlo is used. For interval-based mechanisms, perturbations shift the
-entire item interval and point estimate together (lower, midpoint/mean, upper).
+Perturbation model:
+- Single review edit on one item (± one tick, clipped to [0,1]).
+- For interval-based baselines, candidate edits are scored by induced shift in
+  the item's LOO interval representation (lower, mean, upper).
 """
 
 import argparse

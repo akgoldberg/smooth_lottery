@@ -5,7 +5,6 @@ Current setup only:
 - k configs: 1, 10%, 50%
 - L grid: linear from 0.5*(1/r_min) to 1.0
 - Beta synthetic: repeated draws with error bars
-- No upper/lower bound overlays in plots
 """
 
 import argparse

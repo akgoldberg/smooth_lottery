@@ -499,11 +499,11 @@ def plot_global_smoothness_2x1(
     plt.close(fig)
 
 
-def plot_local_smoothness_2x1(summary_df, k_name: str, out_pdf: str) -> None:
-    """1x2 local-smoothness plot (Linear left, Softmax right) across datasets.
+def plot_local_sensitivity_2x1(summary_df, k_name: str, out_pdf: str) -> None:
+    """1x2 local-sensitivity plot (Linear left, Softmax right) across datasets.
 
     summary_df columns required:
-    - dataset, mechanism, L, local_smoothness
+    - dataset, mechanism, L, local_sensitivity
     """
     fig, axes = plt.subplots(1, 2, figsize=(11.2, 4.4), sharey=True, constrained_layout=True)
     mech_order = ["linear", "softmax"]
@@ -528,7 +528,7 @@ def plot_local_smoothness_2x1(summary_df, k_name: str, out_pdf: str) -> None:
                 continue
             ax.plot(
                 ds_sub["L"].to_numpy(),
-                ds_sub["local_smoothness"].to_numpy(),
+                ds_sub["local_sensitivity"].to_numpy(),
                 color=ds_colors.get(ds, COLORS["Linear Lottery"]),
                 marker=markers[i % len(markers)],
                 linestyle=linestyles[i % len(linestyles)],
@@ -538,7 +538,7 @@ def plot_local_smoothness_2x1(summary_df, k_name: str, out_pdf: str) -> None:
             )
         ax.plot([0.2, 1.0], [0.2, 1.0], linestyle="--", color="black", linewidth=1.2, alpha=0.8, label="_nolegend_")
         ax.set_title(mech_label[mech])
-        ax.set_ylabel("Local Smoothness")
+        ax.set_ylabel("Local Sensitivity")
         ax.grid(alpha=0.25, linestyle=":")
         ax.set_ylim(bottom=0)
         if legend_handles is None:
@@ -557,6 +557,11 @@ def plot_local_smoothness_2x1(summary_df, k_name: str, out_pdf: str) -> None:
     # No figure title for paper-ready exports.
     fig.savefig(out_pdf, bbox_inches="tight", pad_inches=0.02)
     plt.close(fig)
+
+
+def plot_local_smoothness_2x1(summary_df, k_name: str, out_pdf: str) -> None:
+    """Backward-compatible wrapper; use `plot_local_sensitivity_2x1`."""
+    return plot_local_sensitivity_2x1(summary_df=summary_df, k_name=k_name, out_pdf=out_pdf)
 
 
 def plot_baseline_local_sensitivity_panels(summary_df, out_pdf: str) -> None:

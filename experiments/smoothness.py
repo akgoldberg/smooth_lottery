@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
 """
-Merged global smoothness experiment for Softmax and Linear Lottery.
+Global smoothness experiment for Linear Lottery and Softmax.
 
-Outputs:
-- unified summary CSV across mechanisms
-- 1x2 raw empirical-L plots (Linear left, Softmax right)
-- 1x2 ratio plots (Linear left, Softmax right)
-for n=100 and n=1000.
+Purpose:
+- Empirically estimate near-worst-case global smoothness constants.
+- Compare empirical smoothness against target/theoretical smoothness levels.
+
+Method:
+- Uses threshold-family utility constructions parameterized by (n, k, B, eps).
+- Searches over perturbation families to maximize local L1 probability change / input change.
+- Linear Lottery is exact; Softmax uses shared-noise Monte Carlo with search and final re-estimation.
+
+Main outputs:
+- `experiments/results/global_smoothness_summary.csv`
+- `experiments/results/epsilon_response_n100_k10_L1.csv`
+- `experiments/figures/global_smoothness_*_empirical_vs_targetL.pdf`
+- `experiments/figures/global_smoothness_*_ratio_vs_targetL.pdf`
+- `experiments/figures/epsilon_response_n100_k10_L1.pdf`
 """
 
 import argparse
