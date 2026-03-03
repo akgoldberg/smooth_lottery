@@ -1,0 +1,29 @@
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llrrrrrrrrrrrr}
+\toprule
+ & & \multicolumn{4}{c}{MERIT} & \multicolumn{4}{c}{Swiss NSF} & \multicolumn{4}{c}{Threshold} \\
+Dataset & $k$ & Total $\Delta p$ & Max $\Delta p$ & Smoothness & Regret$/k$ & Total $\Delta p$ & Max $\Delta p$ & Smoothness & Regret$/k$ & Total $\Delta p$ & Max $\Delta p$ & Smoothness & Regret$/k$ \\
+\midrule
+ICLR & 10\% & 0.629 & 0.314 & 5.7 & 0.021 & 0.000 & 0.000 & 0.0 & 0.016 & 47.000 & 0.500 & 423.0 & 0.001 \\
+ICLR & 33\% & 0.604 & 0.001 & 5.4 & 0.019 & 0.000 & 0.000 & 0.0 & 0.021 & 12.000 & 1.000 & 108.0 & 0.000 \\
+ICLR & 50\% & 1.262 & 0.504 & 11.4 & 0.008 & 0.000 & 0.000 & 0.0 & 0.011 & 115.000 & 0.500 & 1035.0 & 0.001 \\
+\midrule
+NeurIPS & 10\% & 0.642 & 0.321 & 5.8 & 0.021 & 0.735 & 0.367 & 6.6 & 0.022 & 50.000 & 0.500 & 450.0 & 0.000 \\
+NeurIPS & 33\% & 20.788 & 0.846 & 187.1 & 0.017 & 1.170 & 0.585 & 10.5 & 0.014 & 100.000 & 1.000 & 900.0 & 0.001 \\
+NeurIPS & 50\% & 205.878 & 0.536 & 1852.9 & 0.012 & 1.145 & 0.572 & 10.3 & 0.016 & 159.000 & 0.500 & 1431.0 & 0.001 \\
+\midrule
+Swiss NSF & 10\% & 0.941 & 0.471 & 4.7 & 0.002 & 3.734 & 0.923 & 18.7 & 0.001 & 4.000 & 0.500 & 20.0 & 0.001 \\
+Swiss NSF & 33\% & 2.000 & 0.571 & 10.0 & 0.000 & 1.048 & 0.524 & 5.2 & 0.001 & 2.000 & 0.500 & 10.0 & 0.001 \\
+Swiss NSF & 50\% & 1.405 & 0.564 & 7.0 & 0.001 & 4.286 & 0.429 & 21.4 & 0.001 & 7.000 & 0.500 & 35.0 & 0.001 \\
+\midrule
+Beta & 10\% & 1.000 & 0.500 & 9.0 & 0.001 & 2.667 & 0.667 & 24.0 & 0.000 & 1.000 & 0.500 & 9.0 & 0.001 \\
+Beta & 33\% & 2.000 & 0.500 & 18.0 & 0.000 & 1.893 & 0.625 & 17.0 & 0.000 & 1.000 & 0.500 & 9.0 & 0.001 \\
+Beta & 50\% & 0.778 & 0.367 & 7.0 & 0.000 & 3.111 & 0.556 & 28.0 & 0.000 & 1.000 & 0.500 & 9.0 & 0.002 \\
+\bottomrule
+\end{tabular}
+\caption{Existing baseline partial lotteries. Local sensitivity under a single-review one-tick perturbation, using the edit that maximally shifts the perturbed item's LOO interval representation. Total $\Delta p$ is the L1 change in the marginal probability vector, Max $\Delta p$ is the maximum coordinate change, Smoothness is local sensitivity ($\Delta p_{L1}$/input perturbation magnitude), and Regret$/k$ is expected regret normalized by $k$ on the unperturbed input.}
+\label{tab:baseline_local_sensitivity_existing}
+\end{table}

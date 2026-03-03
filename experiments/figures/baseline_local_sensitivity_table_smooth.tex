@@ -1,0 +1,29 @@
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llrrrrrrrr}
+\toprule
+ & & \multicolumn{4}{c}{Linear Lottery} & \multicolumn{4}{c}{Softmax} \\
+Dataset & $k$ & Total $\Delta p$ & Max $\Delta p$ & Smoothness & Regret$/k$ & Total $\Delta p$ & Max $\Delta p$ & Smoothness & Regret$/k$ \\
+\midrule
+ICLR & 10\% & 0.022 & 0.011 & 0.2 & 0.114 & 0.007 & 0.003 & 0.1 & 0.135 \\
+ICLR & 33\% & 0.037 & 0.019 & 0.3 & 0.075 & 0.028 & 0.014 & 0.3 & 0.077 \\
+ICLR & 50\% & 0.028 & 0.014 & 0.2 & 0.053 & 0.027 & 0.014 & 0.2 & 0.053 \\
+\midrule
+NeurIPS & 10\% & 0.028 & 0.014 & 0.2 & 0.100 & 0.008 & 0.004 & 0.1 & 0.117 \\
+NeurIPS & 33\% & 0.022 & 0.011 & 0.2 & 0.067 & 0.017 & 0.008 & 0.2 & 0.069 \\
+NeurIPS & 50\% & 0.037 & 0.019 & 0.3 & 0.048 & 0.035 & 0.018 & 0.3 & 0.048 \\
+\midrule
+Swiss NSF & 10\% & 0.028 & 0.014 & 0.1 & 0.161 & 0.010 & 0.005 & 0.1 & 0.284 \\
+Swiss NSF & 33\% & 0.025 & 0.012 & 0.1 & 0.168 & 0.020 & 0.010 & 0.1 & 0.188 \\
+Swiss NSF & 50\% & 0.025 & 0.012 & 0.1 & 0.131 & 0.023 & 0.012 & 0.1 & 0.135 \\
+\midrule
+Beta & 10\% & 0.022 & 0.011 & 0.2 & 0.166 & 0.008 & 0.004 & 0.1 & 0.303 \\
+Beta & 33\% & 0.022 & 0.011 & 0.2 & 0.178 & 0.017 & 0.008 & 0.1 & 0.198 \\
+Beta & 50\% & 0.022 & 0.011 & 0.2 & 0.142 & 0.021 & 0.010 & 0.2 & 0.146 \\
+\bottomrule
+\end{tabular}
+\caption{Smooth mechanisms at $L=1/r$. Local sensitivity under a single-review one-tick perturbation, using the edit that maximally shifts the perturbed item's LOO interval representation. Total $\Delta p$ is the L1 change in the marginal probability vector, Max $\Delta p$ is the maximum coordinate change, Smoothness is local sensitivity ($\Delta p_{L1}$/input perturbation magnitude), and Regret$/k$ is expected regret normalized by $k$ on the unperturbed input.}
+\label{tab:baseline_local_sensitivity_smooth}
+\end{table}
