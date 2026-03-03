@@ -25,6 +25,60 @@ _SWISS_NSF_MINT_SECTIONS_PATH = os.path.join(
     _BASELINES_ROOT, "data", "SwissNSFData", "mint_sections.csv",
 )
 
+REVIEW_SCALES = {
+    "neurips2024": (1, 10),
+    "iclr2025": (1, 10),
+    "swissnsf": (1, 6),
+    "synthetic": (0, 1),
+}
+
+
+def review_scale(dataset_key: str) -> tuple:
+    """Return (min_score, max_score) for dataset key."""
+    if dataset_key not in REVIEW_SCALES:
+        raise KeyError(f"Unknown dataset_key for REVIEW_SCALES: {dataset_key}")
+    lo, hi = REVIEW_SCALES[dataset_key]
+    if hi <= lo:
+        raise ValueError(f"Invalid review scale for {dataset_key}: {(lo, hi)}")
+    return float(lo), float(hi)
+
+
+def normalize_with_review_scale(
+    X: np.ndarray,
+    dataset_key: str,
+    theta: np.ndarray = None,
+) -> tuple:
+    """Normalize scores to [0,1] using configured review scale (not sample min/max)."""
+    lo, hi = review_scale(dataset_key)
+    span = hi - lo
+    X_norm = (X - lo) / span
+    theta_norm = None
+    if theta is not None:
+        theta_norm = (theta - lo) / span
+        theta_norm = np.clip(theta_norm, 0.0, 1.0)
+
+    # Keep NaNs in place and clip observed values.
+    X_norm = np.where(np.isnan(X_norm), np.nan, np.clip(X_norm, 0.0, 1.0))
+    meta = {
+        "score_min_raw": lo,
+        "score_max_raw": hi,
+        "normalization": "scale_based",
+    }
+    return X_norm, theta_norm, meta
+
+
+def normalized_tick_size(dataset_key: str, synthetic_ticks: int = 10) -> float:
+    """One raw score tick measured in normalized [0,1] units.
+
+    For synthetic, use user-specified tick count over [0,1] (default 10 ticks => 1/9).
+    """
+    if dataset_key == "synthetic":
+        if synthetic_ticks < 2:
+            raise ValueError("synthetic_ticks must be >= 2")
+        return 1.0 / float(synthetic_ticks - 1)
+    lo, hi = review_scale(dataset_key)
+    return 1.0 / float(hi - lo)
+
 
 # ---------------------------------------------------------------------------
 # Real data loaders
@@ -130,7 +184,7 @@ def generate_beta_reviews(
     n: int, r: int,
     alpha_theta: float = 2.0,
     beta_theta: float = 2.0,
-    kappa: float = 20.0,
+    kappa: float = 100.0,
     rng: np.random.Generator = None,
 ) -> tuple:
     """Beta-on-[0,1] model with reviewer noise around latent quality.

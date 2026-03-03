@@ -9,8 +9,13 @@ import os
 import numpy as np
 
 _BASE = os.path.dirname(os.path.dirname(__file__))
+_BASELINES_ROOT = (
+    os.path.join(_BASE, "merit_baselines")
+    if os.path.isdir(os.path.join(_BASE, "merit_baselines"))
+    else os.path.join(_BASE, "baselines")
+)
 sys.path.insert(0, _BASE)
-sys.path.insert(0, os.path.join(_BASE, "merit_baselines"))
+sys.path.insert(0, _BASELINES_ROOT)
 
 from smooth_lotteries import linear_lottery_smooth, softmax_topk_smooth
 from algorithm.merit import run_merit
@@ -124,7 +129,7 @@ def swiss_nsf_mechanism(X: np.ndarray, k: int,
 def randomize_above_threshold(X: np.ndarray, k: int, m: int) -> np.ndarray:
     """Rank-based randomize-above-threshold.
 
-    Accept top (k - m) deterministically, uniform lottery among ranks
+    Always accept top (k - m), uniform lottery among ranks
     k-m+1 to k+m. Parameter m controls the band half-width.
     """
     v = _nanmean(X)

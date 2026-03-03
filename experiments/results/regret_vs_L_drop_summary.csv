@@ -1,0 +1,5 @@
+dataset,n_before,n_after,r_med_before,min_keep_reviews,dropped_count,beta_alpha,beta_beta,beta_kappa,score_min_raw,score_max_raw,normalization,normalized_tick_size
+beta,200,200,5,,0,2.0,2.0,100.0,0.0,1.0,scale_based,0.1111111111111111
+iclr,3711,3710,4,3.0,1,,,,1.0,10.0,scale_based,0.1111111111111111
+neurips,4035,4034,4,3.0,1,,,,1.0,10.0,scale_based,0.1111111111111111
+swissnsf,353,353,8,,0,,,,1.0,6.0,scale_based,0.2

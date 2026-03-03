@@ -1,115 +1,169 @@
 # Experiments Runbook
 
-This folder contains experiment scripts and plotting/output utilities.
+Shared code path:
+- `experiments/data_utils.py`: dataset loading, normalization to `[0,1]`, review-scale metadata, and synthetic data generation.
+- `experiments/mechanisms.py`: unified mechanism wrappers (Linear Lottery, Softmax, MERIT, Swiss NSF, threshold/randomized baselines) and interval conversion helpers.
+- `experiments/utils.py`: shared normalization and dataset helpers.
+- `experiments/plot_results.py`: centralized plotting for regret/smoothness figures.
 
-## 1) Regret Experiments (`regret.py`)
-
-### What this experiment does
-- Compares **Linear Lottery** vs **Softmax** regret as a function of smoothness `L`.
-- Uses 4 datasets in one run:
-  - `beta` (synthetic data)
-  - `iclr`
-  - `neurips`
-  - `swissnsf`
-- Uses 3 budget settings:
-  - `k=1`
-  - `k=10% of n`
-  - `k=50% of n`
-- Produces 2x2 figures (one panel per dataset) for each `k` setting.
-
-### Script to run
+## Run Main Suite
 ```bash
-python experiments/regret.py \
-  --experiment cross_dataset \
-  --n_softmax_samples 10000 \
-  --beta_trials 50 \
-  --n_L_points 15
+./experiments/run_all_experiments.sh
+```
+This runs:
+1. `experiments/regret.py` (with `--clear_old`)
+2. `experiments/utility_ccdf.py`
+3. `experiments/smoothness.py` (empirical estimate of global smoothness)
+4. `experiments/local_smoothness.py` (empirical estimate of single-item perturbation local smoothness)
+5. `experiments/baseline_local_sensitivity.py` (existing baseline partial-lottery local sensitivity + table)
+
+Expected runtime:
+- Full suite: typically ~45 to 70 minutes on a laptop CPU (dominated by local smoothness + MERIT baseline runs).
+
+## Regret (`regret.py`)
+Goal:
+- Measure regret vs smoothness level `L` across real and synthetic datasets, and compare Linear Lottery vs Softmax under different acceptance-rate settings.
+
+High-level setup:
+- Regret vs target smoothness `L` on `Beta`, `ICLR`, `NeurIPS`, `Swiss NSF`.
+- `k ∈ {1, 10%, 33%, 50%}`.
+- Includes the symmetric Beta sweep (`alpha=beta`) used in current analysis.
+
+Run:
+```bash
+python experiments/regret.py --clear_old
 ```
 
-### Main parameters
-- `--n_softmax_samples`: number of samples to estimate Softmax inclusion probs.
-- `--beta_trials`: number of independent synthetic (`beta`) draws.
-- `--n_L_points`: number of `L` points per curve.
-- `--normalize_by_k` / `--no_normalize_by_k`: plot `Regret/k` vs raw `Regret`.
+Expected runtime:
+- ~8 to 15 minutes (depends on softmax sample settings and machine).
 
-### Figures + results generated
-- `regret_vs_L_cross_{k_config}.pdf`
-- `regret_vs_L_cross_{dataset}_{k_config}.csv`
-- `regret_vs_L_cross_drop_summary.csv`
-- `regret_vs_L_cross_drop_log.csv`
+Outputs:
+- `experiments/results/regret_vs_L_*.csv`
+- `experiments/results/regret_vs_L_drop_*.csv`
+- `experiments/results/regret_beta_sweep_*.csv`
+- `experiments/figures/regret_vs_L_*.pdf`
+- `experiments/figures/regret_beta_sweep_*.pdf`
 
-## 2) Regret Re-Plot (`plot_regret_cross.py`)
+## Utility CCDF (`utility_ccdf.py`)
+Goal:
+- Compare utility-tail structure across datasets to interpret why regret differs by dataset.
 
-### What this script does
-- Regenerates cross-dataset regret figures from existing CSV outputs.
-- Does **not** rerun mechanisms.
-- Intended for fast iteration on styling/labels.
+High-level setup:
+- CCDF of normalized mean utilities across the four datasets.
 
-### Script to run
+Run:
 ```bash
-python experiments/plot_regret_cross.py \
-  --normalize_by_k \
-  --output_dir experiments/results \
-  --fig_dir experiments/figures
+python experiments/utility_ccdf.py
 ```
 
-### Figures generated
-- `regret_vs_L_cross_{k_config}.pdf`
+Expected runtime:
+- <1 minute.
 
-## 3) Regret Tightness Diagnostics (`regret_tightness.py`)
+Outputs:
+- `experiments/results/utility_ccdf_summary.csv`
+- `experiments/figures/utility_ccdf_datasets.pdf`
 
-### What this experiment does
-- Computes diagnostics for how tight regret upper bounds are.
-- For each `k` config and dataset:
-  - ratio diagnostic: `Regret / Upper bound`
-  - gap diagnostic: `Upper bound - Regret`
-- Uses the same 4 datasets as `regret.py`.
+## Global Smoothness (`smoothness.py`)
+Goal:
+- Empirically assess tightness of global smoothness bounds for Linear Lottery and Softmax on worst-case-inspired constructions.
 
-### Script to run
-```bash
-python experiments/regret_tightness.py \
-  --n_softmax_samples 10000 \
-  --beta_trials 20 \
-  --n_L_points 15
-```
+High-level setup:
+- Global smoothness search for Linear Lottery and Softmax.
+- Produces empirical smoothness curves and ratio-to-target-`L` curves for `n=100,1000`.
+- Also produces epsilon-response diagnostics (`n=100`, `k=10%`, `L=1`) with three panels:
+  - near-uniform (`\Delta p_1`)
+  - worst-case family around the threshold item (`\Delta p_k`)
+  - top-`k` edge perturbation (`\Delta p_k`)
+- Near-worst-case construct used in the search:
+  - Base utilities: `u_1,...,u_{k-1}=1`, `u_k=B`, `u_{k+1},...,u_n=0`.
+  - Perturbation: change only the threshold item (`k`-th item), `u_k -> u_k ± ε` (clipped to `[0,1]`).
+  - Grid search over `B` and `ε` (and perturbation direction), then re-estimate the best candidate with larger Monte Carlo for Softmax.
 
-### Figures + results generated
-- `regret_tightness_ratio_{k_config}.pdf`
-- `regret_tightness_gap_{k_config}.pdf`
-- `regret_tightness_{dataset}_{k_config}.csv`
-
-## 4) Smoothness Experiments (`smoothness.py`)
-
-### What this experiment does
-- Estimates empirical smoothness (local Lipschitz behavior) of mechanisms.
-- Two modes:
-  - `comparison`: fixed `L`, compare mechanisms.
-  - `vs_L`: sweep target `L`.
-
-### Script to run (comparison mode)
+Run:
 ```bash
 python experiments/smoothness.py \
-  --experiment comparison \
-  --data neurips \
-  --L 2.0 \
-  --n_perturbations 200
+  --softmax-search-samples 5000 \
+  --softmax-final-samples 50000
 ```
 
-### Script to run (L-sweep mode)
+Expected runtime:
+- ~8 to 15 minutes.
+
+Outputs:
+- `experiments/results/global_smoothness_summary.csv`
+- `experiments/results/epsilon_response_n100_k10_L1.csv`
+- `experiments/figures/global_smoothness_n100_empirical_vs_targetL.pdf`
+- `experiments/figures/global_smoothness_n1000_empirical_vs_targetL.pdf`
+- `experiments/figures/global_smoothness_n100_ratio_vs_targetL.pdf`
+- `experiments/figures/global_smoothness_n1000_ratio_vs_targetL.pdf`
+- `experiments/figures/epsilon_response_n100_k10_L1.pdf`
+
+## Local Smoothness (`local_smoothness.py`)
+Goal:
+- Estimate local sensitivity near the decision boundary under realistic one-review perturbations in each dataset.
+
+High-level setup:
+- Single-review, one-tick perturbations at rank `k` and `k+1` for each dataset.
+- `k ∈ {10%, 33%, 50%}` and `L ∈ {0.2,0.4,0.6,0.8,1.0}`.
+- Softmax uses two-stage estimation:
+  - search phase to choose perturbation
+  - fresh final resampling for the reported value
+
+Perturbation used (exact):
+- Candidate items are only the utility-ranked boundary items: rank `k` and rank `k+1`.
+- For each candidate item, change only one observed review entry (the first observed review).
+- Evaluate two one-tick edits: `+tick` and `-tick`, clipped to `[0,1]`; report the larger local effect.
+- Tick in normalized units:
+  - ICLR/NeurIPS (raw 1–10): `1/9`
+  - Swiss NSF (raw 1–6): `1/5`
+  - Synthetic Beta: treated as 10 ticks on `[0,1]` => `1/9`
+- If clipping is active, the actual perturbation size is smaller and recorded as `l11_delta` in the CSV.
+
+Recommended final run (low-noise):
 ```bash
-python experiments/smoothness.py \
-  --experiment vs_L \
-  --data gaussian \
-  --n_perturbations 200
+python experiments/local_smoothness.py \
+  --k_names k10pct,k33pct,k50pct \
+  --L_values 0.2,0.4,0.6,0.8,1.0 \
+  --softmax_search_samples 800 \
+  --softmax_search_reps 2 \
+  --softmax_final_samples 10000 \
+  --softmax_final_reps 3
 ```
 
-### Figures + results generated
-- `smoothness_comparison_{data}.pdf`
-- `smoothness_hist_{data}.pdf`
-- `smoothness_vs_L_{data}.pdf`
-- matching CSVs in `experiments/results/`
+Expected runtime:
+- ~20 to 35 minutes (highest-variance cost component).
 
-## Notes
-- Plots are written to `experiments/figures/`.
-- CSV outputs are written to `experiments/results/`.
-- Plot styling utilities live in `experiments/plot_results.py`.
+Outputs:
+- `experiments/results/local_smoothness_all.csv`
+- `experiments/results/local_smoothness_all_summary.csv`
+- `experiments/figures/local_smoothness_k10pct.pdf`
+- `experiments/figures/local_smoothness_k33pct.pdf`
+- `experiments/figures/local_smoothness_k50pct.pdf`
+
+## Baseline Existing Partial-Lottery Sensitivity (`baseline_local_sensitivity.py`)
+Goal:
+- Compare worst-case local sensitivity (single-review one-tick perturbation) for existing baseline partial lotteries.
+
+High-level setup:
+- Mechanisms: existing baseline partial lotteries (`MERIT`, `Swiss NSF`, `Randomized Threshold`).
+- Uses normalized review data and leave-one-out intervals.
+- For each candidate item, picks the one-review edit that maximally shifts that item's interval representation.
+- Candidate search:
+  - `MERIT`: focused around boundary (`k/k+1` by default).
+  - `Swiss NSF` and `Randomized Threshold`: all items (`--swiss_candidate_window -1 --threshold_candidate_window -1`).
+- Outputs a LaTeX table from the same summary.
+
+Run:
+```bash
+python experiments/baseline_local_sensitivity.py \
+  --swiss_candidate_window -1 \
+  --threshold_candidate_window -1
+```
+
+Expected runtime:
+- ~15 to 30 minutes (MERIT LP solves dominate).
+
+Outputs:
+- `experiments/results/baseline_local_sensitivity.csv`
+- `experiments/results/baseline_local_sensitivity_summary.csv`
+- `experiments/figures/baseline_local_sensitivity_table.tex`

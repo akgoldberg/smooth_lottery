@@ -21,6 +21,7 @@ build/
 *.coverage
 .hypothesis/
 .mypy_cache/
+.mplcache/
 
 # Jupyter
 .ipynb_checkpoints
@@ -35,7 +36,7 @@ build/
 res/
 selection_probabilities.csv
 
-# Context for agent
+# Context for agents
 paper.tex
 CLAUDE.md
 AGENT.md

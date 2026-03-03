@@ -133,6 +133,15 @@ def softmax_topk(
     if rng is None:
         rng = np.random.default_rng()
 
+    # k=1 has an exact closed form (Plackett-Luce / softmax), so no MC needed.
+    if k == 1:
+        logits = v / tau
+        logits = logits - np.max(logits)
+        exp_logits = np.exp(logits)
+        p = exp_logits / exp_logits.sum()
+        sample = [int(rng.choice(n, p=p))]
+        return p, sample
+
     # Gumbel(0, tau) via inverse CDF: -tau * log(-log(U))
     U = rng.uniform(size=(n_samples, n))
     gumbel = -tau * np.log(-np.log(np.clip(U, 1e-10, 1.0 - 1e-10)))

@@ -11,6 +11,8 @@ Current setup only:
 import argparse
 import os
 import sys
+import glob
+from types import SimpleNamespace
 from typing import Callable, List, Optional, Tuple
 
 import numpy as np
@@ -21,8 +23,13 @@ sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, _BASE)
 
 from mechanisms import linear_lottery_mechanism, softmax_mechanism
-from data_utils import load_review_matrix, load_swiss_nsf_point_estimates, generate_beta_reviews
-from plot_results import plot_regret_vs_param_sidebyside
+from data_utils import (
+    load_review_matrix,
+    load_swiss_nsf_point_estimates,
+    generate_beta_reviews,
+)
+from utils import reviews_per_item, r_min, r_med, normalize_scores
+from plot_results import plot_regret_vs_param_sidebyside, plot_beta_sweep
 
 
 # ---------------------------------------------------------------------------
@@ -34,59 +41,27 @@ def compute_regret(v: np.ndarray, p: np.ndarray, k: int) -> float:
     return float(top_k_vals.sum() - np.dot(v, p))
 
 
-def reviews_per_item(X: np.ndarray) -> np.ndarray:
-    return np.sum(~np.isnan(X), axis=1)
-
-
-def r_min(X: np.ndarray) -> int:
-    counts = reviews_per_item(X)
-    return int(np.min(counts[counts > 0]))
-
-
-def r_med(X: np.ndarray) -> int:
-    counts = reviews_per_item(X)
-    return int(np.median(counts[counts > 0]))
-
-
 def compact_label(label: str) -> str:
+    if label.startswith("Beta("):
+        return "Beta"
     return (label
-            .replace("Beta(2,2), kappa=20", "Beta")
             .replace("Swiss NSF (mint_sections means)", "Swiss NSF")
             .replace("NeurIPS 2024", "NeurIPS")
-            .replace("ICLR 2025", "ICLR")
-            .replace("Beta", "Beta"))
+            .replace("ICLR 2025", "ICLR"))
 
 
 def normalize_to_unit_interval(
-    X: np.ndarray, theta: Optional[np.ndarray]
+    X: np.ndarray, theta: Optional[np.ndarray], dataset_key: str
 ) -> Tuple[np.ndarray, Optional[np.ndarray], dict]:
-    """Affine-normalize observed review scores to [0, 1].
-
-    Uses global min/max over non-NaN entries of X for each dataset realization.
-    Applies the same transform to theta when provided, then clips theta to [0, 1].
-    """
-    mask = ~np.isnan(X)
-    x_min = float(np.min(X[mask]))
-    x_max = float(np.max(X[mask]))
-    span = x_max - x_min
-
-    if span <= 0:
-        X_norm = np.zeros_like(X, dtype=float)
-        theta_norm = None if theta is None else np.zeros_like(theta, dtype=float)
-    else:
-        X_norm = (X - x_min) / span
-        theta_norm = None
-        if theta is not None:
-            theta_norm = np.clip((theta - x_min) / span, 0.0, 1.0)
-
-    meta = {"score_min_raw": x_min, "score_max_raw": x_max}
-    return X_norm, theta_norm, meta
+    """Scale-based normalization to [0,1] using configured review scales."""
+    return normalize_scores(X, dataset_key=dataset_key, theta=theta, synthetic_ticks=10)
 
 
 def k_configs() -> List[Tuple[str, Callable[[int], int]]]:
     return [
         ("k1", lambda n: 1),
         ("k10pct", lambda n: max(1, min(int(0.1 * n), n - 1))),
+        ("k33pct", lambda n: max(1, min(int(round(n / 3.0)), n - 1))),
         ("k50pct", lambda n: max(1, min(int(0.5 * n), n - 1))),
     ]
 
@@ -190,7 +165,7 @@ def load_dataset(data_name: str, args, rng):
         X, theta, ids, summary, rows = drop_low_review_outliers(
             X, None, paper_ids, dataset="neurips"
         )
-        X, theta, norm_meta = normalize_to_unit_interval(X, theta)
+        X, theta, norm_meta = normalize_to_unit_interval(X, theta, dataset_key="neurips2024")
         summary.update(norm_meta)
         return X, theta, "NeurIPS 2024", ids, summary, rows
 
@@ -199,7 +174,7 @@ def load_dataset(data_name: str, args, rng):
         X, theta, ids, summary, rows = drop_low_review_outliers(
             X, None, paper_ids, dataset="iclr"
         )
-        X, theta, norm_meta = normalize_to_unit_interval(X, theta)
+        X, theta, norm_meta = normalize_to_unit_interval(X, theta, dataset_key="iclr2025")
         summary.update(norm_meta)
         return X, theta, "ICLR 2025", ids, summary, rows
 
@@ -214,12 +189,12 @@ def load_dataset(data_name: str, args, rng):
             "min_keep_reviews": np.nan,
             "dropped_count": 0,
         }
-        X, theta, norm_meta = normalize_to_unit_interval(X, theta)
+        X, theta, norm_meta = normalize_to_unit_interval(X, theta, dataset_key="swissnsf")
         summary.update(norm_meta)
         return X, theta, "Swiss NSF (mint_sections means)", ids, summary, []
 
     if data_name == "beta":
-        alpha_theta, beta_theta, kappa = 2.0, 2.0, 20.0
+        alpha_theta, beta_theta, kappa = 2.0, 2.0, float(args.beta_kappa)
         X, theta = generate_beta_reviews(
             n=args.n, r=args.r,
             alpha_theta=alpha_theta,
@@ -239,9 +214,9 @@ def load_dataset(data_name: str, args, rng):
             "beta_beta": beta_theta,
             "beta_kappa": kappa,
         }
-        X, theta, norm_meta = normalize_to_unit_interval(X, theta)
+        X, theta, norm_meta = normalize_to_unit_interval(X, theta, dataset_key="synthetic")
         summary.update(norm_meta)
-        return X, theta, f"Beta(2,2), kappa=20 (n={args.n}, r={args.r})", ids, summary, []
+        return X, theta, f"Beta(2,2), kappa={kappa:g} (n={args.n}, r={args.r})", ids, summary, []
 
     raise ValueError(f"Unknown data source: {data_name}")
 
@@ -253,16 +228,88 @@ def load_dataset(data_name: str, args, rng):
 def save_drop_logs(output_dir: str, summaries: List[dict], dropped_rows: List[dict]) -> None:
     os.makedirs(output_dir, exist_ok=True)
     pd.DataFrame(summaries).to_csv(
-        os.path.join(output_dir, "regret_vs_L_cross_drop_summary.csv"), index=False
+        os.path.join(output_dir, "regret_vs_L_drop_summary.csv"), index=False
     )
     pd.DataFrame(dropped_rows).to_csv(
-        os.path.join(output_dir, "regret_vs_L_cross_drop_log.csv"), index=False
+        os.path.join(output_dir, "regret_vs_L_drop_log.csv"), index=False
     )
+
+
+def clear_old_cross_outputs(output_dir: str, fig_dir: str) -> None:
+    for pattern in [
+        os.path.join(output_dir, "regret_vs_L_*.csv"),
+        os.path.join(fig_dir, "regret_vs_L_*.pdf"),
+    ]:
+        for path in glob.glob(pattern):
+            os.remove(path)
+            print(f"Removed old artifact: {path}")
+
+
+def clear_old_cross_figures(fig_dir: str) -> None:
+    for path in glob.glob(os.path.join(fig_dir, "regret_vs_L_*.pdf")):
+        os.remove(path)
+        print(f"Removed old artifact: {path}")
+
+
+def replot_cross_dataset(args) -> None:
+    datasets = ["beta", "iclr", "neurips", "swissnsf"]
+    k_names = ["k1", "k10pct", "k33pct", "k50pct"]
+
+    os.makedirs(args.fig_dir, exist_ok=True)
+    if args.clear_old:
+        clear_old_cross_figures(args.fig_dir)
+
+    meta_args = SimpleNamespace(n=args.n, r=args.r, beta_kappa=args.beta_kappa)
+    rng = np.random.default_rng(args.seed)
+    meta = {}
+    for ds in datasets:
+        X, _, label, _, _, _ = load_dataset(ds, meta_args, rng)
+        meta[ds] = (compact_label(label), X.shape[0], r_med(X))
+
+    for k_name in k_names:
+        panel_results = []
+        subtitles = []
+        for ds in datasets:
+            path = os.path.join(args.output_dir, f"regret_vs_L_{ds}_{k_name}.csv")
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"Missing input CSV: {path}")
+            df = pd.read_csv(path)
+            k = float(df["k"].iloc[0])
+            res = {c: df[c].tolist() for c in df.columns}
+            if args.normalize_by_k:
+                res["regret_linear"] = (df["regret_linear"] / k).tolist()
+                res["regret_softmax"] = (df["regret_softmax"] / k).tolist()
+                if "regret_linear_std" in df.columns:
+                    res["regret_linear_std"] = (df["regret_linear_std"] / k).tolist()
+                if "regret_softmax_std" in df.columns:
+                    res["regret_softmax_std"] = (df["regret_softmax_std"] / k).tolist()
+
+            label, n, r = meta[ds]
+            subtitles.append(f"{label} (n={n}, r={r})")
+            panel_results.append(res)
+
+        fig_path = os.path.join(args.fig_dir, f"regret_vs_L_{k_name}.pdf")
+        plot_regret_vs_param_sidebyside(
+            panel_results,
+            "L",
+            subtitles=subtitles,
+            suptitle="",
+            save_path=fig_path,
+            logx=False,
+            include_bounds=False,
+            x_label=r"$L$",
+            y_label="Regret / k" if args.normalize_by_k else "Regret",
+            ncols=2,
+            sharey=False,
+        )
+        print(f"Saved {fig_path}")
 
 
 def run_cross_dataset(args) -> None:
     os.makedirs(args.output_dir, exist_ok=True)
     os.makedirs(args.fig_dir, exist_ok=True)
+    if args.clear_old:
+        clear_old_cross_outputs(args.output_dir, args.fig_dir)
 
     base_rng = np.random.default_rng(args.seed)
     datasets = ["beta", "iclr", "neurips", "swissnsf"]
@@ -321,7 +368,7 @@ def run_cross_dataset(args) -> None:
             res["r_min"] = [rmin] * len(res["L"])
             res["r_med"] = [rm] * len(res["L"])
 
-            out_csv = os.path.join(args.output_dir, f"regret_vs_L_cross_{data_name}_{k_name}.csv")
+            out_csv = os.path.join(args.output_dir, f"regret_vs_L_{data_name}_{k_name}.csv")
             pd.DataFrame(res).to_csv(out_csv, index=False)
             print(f"    Saved {out_csv}")
 
@@ -339,7 +386,7 @@ def run_cross_dataset(args) -> None:
                 panel_results.append(res)
             subtitles.append(f"{compact_label(label)} (n={n}, r={rm})")
 
-        fig_path = os.path.join(args.fig_dir, f"regret_vs_L_cross_{k_name}.pdf")
+        fig_path = os.path.join(args.fig_dir, f"regret_vs_L_{k_name}.pdf")
         plot_regret_vs_param_sidebyside(
             panel_results,
             "L",
@@ -356,19 +403,122 @@ def run_cross_dataset(args) -> None:
         print(f"  Saved {fig_path}")
 
 
+# ---------------------------------------------------------------------------
+# Symmetric Beta sweep (merged from regret_beta_sweep.py)
+# ---------------------------------------------------------------------------
+
+def parse_l_multipliers(s: str) -> List[float]:
+    return [float(x.strip()) for x in s.split(",") if x.strip()]
+
+
+def _beta_sweep_k_fn(k_name: str):
+    if k_name == "k10pct":
+        return lambda n: max(1, min(int(0.1 * n), n - 1))
+    if k_name == "k33pct":
+        return lambda n: max(1, min(int(round(n / 3.0)), n - 1))
+    if k_name == "k50pct":
+        return lambda n: max(1, min(int(0.5 * n), n - 1))
+    raise ValueError(f"Unknown k_name for beta sweep: {k_name}")
+
+
+def run_beta_symmetric_sweep(args, k_name: str) -> pd.DataFrame:
+    rows = []
+    k_fn = _beta_sweep_k_fn(k_name)
+    for alpha in range(args.beta_sweep_alpha_min, args.beta_sweep_alpha_max + 1):
+        for trial in range(args.beta_sweep_trials):
+            rng = np.random.default_rng(args.seed + 10000 * alpha + trial)
+            X, theta = generate_beta_reviews(
+                n=args.n,
+                r=args.r,
+                alpha_theta=float(alpha),
+                beta_theta=float(alpha),
+                kappa=args.beta_kappa,
+                rng=rng,
+            )
+            Xn, theta_n, _ = normalize_scores(X, dataset_key="synthetic", theta=theta, synthetic_ticks=10)
+            v = theta_n if theta_n is not None else np.nanmean(Xn, axis=1)
+            n_items = Xn.shape[0]
+            k = k_fn(n_items)
+            r_value = args.r
+
+            for L_mult in args.beta_sweep_L_multipliers:
+                L = float(L_mult * (1.0 / r_value))
+                p_lin = linear_lottery_mechanism(Xn, k, L)
+                p_soft = softmax_mechanism(
+                    Xn,
+                    k,
+                    L,
+                    n_samples=args.beta_sweep_softmax_samples,
+                    rng=rng,
+                )
+                rows.append(
+                    {
+                        "k_name": k_name,
+                        "alpha": alpha,
+                        "beta": alpha,
+                        "trial": trial,
+                        "n": n_items,
+                        "r": r_value,
+                        "k": k,
+                        "L_multiplier": L_mult,
+                        "L": L,
+                        "regret_linear": compute_regret(v, p_lin, k),
+                        "regret_softmax": compute_regret(v, p_soft, k),
+                    }
+                )
+    df = pd.DataFrame(rows)
+    df["regret_linear_per_k"] = df["regret_linear"] / df["k"]
+    df["regret_softmax_per_k"] = df["regret_softmax"] / df["k"]
+    return df
+
+
+def run_beta_sweep_experiment(args) -> None:
+    os.makedirs(args.output_dir, exist_ok=True)
+    os.makedirs(args.fig_dir, exist_ok=True)
+    k_names = [x.strip() for x in args.beta_sweep_k_names.split(",") if x.strip()]
+    for k_name in k_names:
+        df = run_beta_symmetric_sweep(args, k_name=k_name)
+        out_csv = os.path.join(args.output_dir, f"regret_beta_sweep_{k_name}.csv")
+        out_pdf = os.path.join(args.fig_dir, f"regret_beta_sweep_{k_name}.pdf")
+        df.to_csv(out_csv, index=False)
+        plot_beta_sweep(df, out_pdf=out_pdf, k_name=k_name)
+        print(f"Saved {out_csv}")
+        print(f"Saved {out_pdf}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Cross-dataset regret experiments")
     parser.add_argument("--experiment", choices=["cross_dataset"], default="cross_dataset")
+    parser.add_argument("--plot_only", action="store_true",
+                        help="Regenerate regret figures from existing CSVs without rerunning mechanisms.")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--n", type=int, default=200, help="Beta synthetic n")
     parser.add_argument("--r", type=int, default=5, help="Beta synthetic reviews per item")
+    parser.add_argument("--beta_kappa", type=float, default=100.0,
+                        help="Beta reviewer-noise concentration (higher => lower reviewer noise).")
     parser.add_argument("--n_softmax_samples", type=int, default=10000)
     parser.add_argument("--beta_trials", type=int, default=50)
     parser.add_argument("--n_L_points", type=int, default=15)
     parser.add_argument("--normalize_by_k", action="store_true", default=True)
     parser.add_argument("--no_normalize_by_k", action="store_false", dest="normalize_by_k")
+    parser.add_argument("--clear_old", action="store_true", default=True)
+    parser.add_argument("--no_clear_old", action="store_false", dest="clear_old")
     parser.add_argument("--output_dir", default=os.path.join(os.path.dirname(__file__), "results"))
     parser.add_argument("--fig_dir", default=os.path.join(os.path.dirname(__file__), "figures"))
+    parser.add_argument("--run_beta_sweep", action="store_true", default=True)
+    parser.add_argument("--no_run_beta_sweep", action="store_false", dest="run_beta_sweep")
+    parser.add_argument("--beta_sweep_alpha_min", type=int, default=1)
+    parser.add_argument("--beta_sweep_alpha_max", type=int, default=10)
+    parser.add_argument("--beta_sweep_k_names", default="k10pct,k33pct,k50pct")
+    parser.add_argument("--beta_sweep_L_multipliers", default="1.0,2.0")
+    parser.add_argument("--beta_sweep_trials", type=int, default=20)
+    parser.add_argument("--beta_sweep_softmax_samples", type=int, default=6000)
     args = parser.parse_args()
+    args.beta_sweep_L_multipliers = parse_l_multipliers(args.beta_sweep_L_multipliers)
 
-    run_cross_dataset(args)
+    if args.plot_only:
+        replot_cross_dataset(args)
+    else:
+        run_cross_dataset(args)
+        if args.run_beta_sweep:
+            run_beta_sweep_experiment(args)
