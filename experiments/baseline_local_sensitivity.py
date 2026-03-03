@@ -11,6 +11,7 @@ entire item interval and point estimate together (lower, midpoint/mean, upper).
 """
 
 import argparse
+import math
 import os
 import sys
 from typing import Dict, List, Tuple
@@ -30,7 +31,12 @@ sys.path.insert(0, _BASELINES_ROOT)
 
 from algorithm.helpers import swiss_nsf as swiss_nsf_intervals
 from data_utils import generate_beta_reviews, load_review_matrix, load_swiss_nsf_point_estimates
-from mechanisms import randomize_above_threshold, reviews_to_intervals
+from mechanisms import (
+    linear_lottery_mechanism,
+    randomize_above_threshold,
+    reviews_to_intervals,
+    softmax_mechanism,
+)
 from utils import drop_low_review_outliers, k_from_name, normalize_scores, r_min
 
 
@@ -160,7 +166,12 @@ def baseline_probs(
     x_mean: np.ndarray,
     k: int,
     m_band: int,
+    L_smooth: float,
+    softmax_samples: int,
+    softmax_seed: int,
     include_merit: bool,
+    include_linear: bool,
+    include_softmax: bool,
 ) -> Dict[str, np.ndarray]:
     p_swiss = swiss_nsf_intervals(intervals, list(x_mean), k)
     p_thresh = randomize_above_threshold(X, k=k, m=m_band)
@@ -170,6 +181,16 @@ def baseline_probs(
     }
     if include_merit:
         out["MERIT"] = _run_merit(intervals, k)
+    if include_linear:
+        out["Linear Lottery"] = linear_lottery_mechanism(X, k=k, L=L_smooth)
+    if include_softmax:
+        out["Softmax"] = softmax_mechanism(
+            X,
+            k=k,
+            L=L_smooth,
+            n_samples=softmax_samples,
+            rng=np.random.default_rng(softmax_seed),
+        )
     return out
 
 
@@ -182,7 +203,7 @@ def candidate_items(v: np.ndarray, k: int, window: int) -> List[int]:
 
 
 def parse_mechanisms(spec: str) -> List[str]:
-    allowed = {"MERIT", "Swiss NSF", "Randomized Threshold"}
+    allowed = {"MERIT", "Swiss NSF", "Randomized Threshold", "Linear Lottery", "Softmax"}
     out = [x.strip() for x in spec.split(",") if x.strip()]
     for mech in out:
         if mech not in allowed:
@@ -190,13 +211,58 @@ def parse_mechanisms(spec: str) -> List[str]:
     return out
 
 
-def write_baseline_table_tex(summary: pd.DataFrame, out_tex: str) -> None:
-    """Write LaTeX table for baseline local sensitivity summary."""
-    mech_map = {
-        "MERIT": "MERIT",
-        "Swiss NSF": "Swiss NSF",
-        "Randomized Threshold": "Threshold",
-    }
+def expected_regret(v: np.ndarray, p: np.ndarray, k: int) -> float:
+    top_sum = float(np.sort(v)[-k:].sum())
+    return top_sum - float(np.dot(v, p))
+
+
+def _softmax_tau_from_L(L: float, D_v: float, k: int) -> float:
+    if k == 1:
+        return D_v / (2.0 * L)
+    return 2.0 * D_v / (math.e * L)
+
+
+def _softmax_paired_probs_from_utils(
+    v0: np.ndarray,
+    v1: np.ndarray,
+    k: int,
+    L: float,
+    D_v: float,
+    samples: int,
+    seed: int,
+    reps: int,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Estimate softmax marginals for (v0, v1) using shared Gumbel draws."""
+    n = len(v0)
+    tau = _softmax_tau_from_L(L=L, D_v=D_v, k=k)
+    p0_acc = np.zeros(n, dtype=float)
+    p1_acc = np.zeros(n, dtype=float)
+    reps = max(1, int(reps))
+    for rep in range(reps):
+        rng = np.random.default_rng(seed + 1009 * rep)
+        g = rng.gumbel(loc=0.0, scale=tau, size=(samples, n))
+        y0 = v0[None, :] + g
+        y1 = v1[None, :] + g
+        idx0 = np.argpartition(y0, kth=n - k, axis=1)[:, -k:]
+        idx1 = np.argpartition(y1, kth=n - k, axis=1)[:, -k:]
+        c0 = np.bincount(idx0.ravel(), minlength=n).astype(float)
+        c1 = np.bincount(idx1.ravel(), minlength=n).astype(float)
+        p0 = c0 / float(samples)
+        p1 = c1 / float(samples)
+        p0 = p0 / p0.sum() * k
+        p1 = p1 / p1.sum() * k
+        p0_acc += p0
+        p1_acc += p1
+    return p0_acc / reps, p1_acc / reps
+
+
+def _write_table_block(
+    summary: pd.DataFrame,
+    mech_map: List[Tuple[str, str]],
+    caption: str,
+    label: str,
+    out_tex: str,
+) -> None:
     dataset_order = ["ICLR", "NeurIPS", "Swiss NSF", "Beta"]
     k_order = ["k10pct", "k33pct", "k50pct"]
     k_label = {"k10pct": "10\\%", "k33pct": "33\\%", "k50pct": "50\\%"}
@@ -206,46 +272,113 @@ def write_baseline_table_tex(summary: pd.DataFrame, out_tex: str) -> None:
         for k_name in k_order:
             block = summary[(summary["dataset"] == d) & (summary["k_name"] == k_name)]
             row = {"dataset": d, "k": k_label[k_name]}
-            for src, dst in mech_map.items():
+            for src, dst in mech_map:
                 t = block[block["mechanism"] == src]
                 if len(t):
-                    row[f"{dst}_l1"] = float(t["l1_prob_change"].iloc[0])
+                    row[f"{dst}_total_dp"] = float(t["l1_prob_change"].iloc[0])
+                    row[f"{dst}_max_dp"] = float(t["max_prob_change"].iloc[0])
                     row[f"{dst}_sens"] = float(t["local_sensitivity"].iloc[0])
+                    if "expected_regret_per_k" in t.columns:
+                        row[f"{dst}_regret_per_k"] = float(t["expected_regret_per_k"].iloc[0])
+                    elif "expected_regret" in t.columns and "k" in t.columns:
+                        kval = float(t["k"].iloc[0])
+                        row[f"{dst}_regret_per_k"] = float(t["expected_regret"].iloc[0]) / kval if kval > 0 else np.nan
+                    else:
+                        row[f"{dst}_regret_per_k"] = np.nan
                 else:
-                    row[f"{dst}_l1"] = np.nan
+                    row[f"{dst}_total_dp"] = np.nan
+                    row[f"{dst}_max_dp"] = np.nan
                     row[f"{dst}_sens"] = np.nan
+                    row[f"{dst}_regret_per_k"] = np.nan
             rows.append(row)
 
-    def fmt(x: float) -> str:
+    def fmt_dp(x: float) -> str:
         return "-" if pd.isna(x) else f"{x:.3f}"
 
+    smooth_only = all(label in {"Linear Lottery", "Softmax"} for _, label in mech_map)
+
+    def fmt_s(x: float) -> str:
+        if pd.isna(x):
+            return "-"
+        return f"{x:.2f}" if smooth_only else f"{x:.1f}"
+
+    def fmt_rk(x: float) -> str:
+        return "-" if pd.isna(x) else f"{x:.3f}"
+
+    colspec = "ll|" + "|".join(["rrrr" for _ in mech_map])
     lines = [
         r"\begin{table}[t]",
         r"\centering",
         r"\small",
         r"\setlength{\tabcolsep}{4pt}",
-        r"\begin{tabular}{llrrrrrr}",
+        r"\begin{tabular}{" + colspec + "}",
         r"\toprule",
-        r" & & \multicolumn{2}{c}{MERIT} & \multicolumn{2}{c}{Swiss NSF} & \multicolumn{2}{c}{Threshold} \\",
-        r"Dataset & $k$ & $\Delta p_{L1}$ & Sens. & $\Delta p_{L1}$ & Sens. & $\Delta p_{L1}$ & Sens. \\",
+        r" & & " + " & ".join([rf"\multicolumn{{4}}{{c}}{{{label}}}" for _, label in mech_map]) + r" \\",
+        r"Dataset & $k$ & " + " & ".join([r"Total $\Delta p$ & Max $\Delta p$ & Smoothness & Regret$/k$" for _ in mech_map]) + r" \\",
         r"\midrule",
     ]
-    for r in rows:
-        lines.append(
-            f"{r['dataset']} & {r['k']} & "
-            f"{fmt(r['MERIT_l1'])} & {fmt(r['MERIT_sens'])} & "
-            f"{fmt(r['Swiss NSF_l1'])} & {fmt(r['Swiss NSF_sens'])} & "
-            f"{fmt(r['Threshold_l1'])} & {fmt(r['Threshold_sens'])} \\\\"
-        )
+    for d_idx, d in enumerate(dataset_order):
+        d_rows = [r for r in rows if r["dataset"] == d]
+        for r in d_rows:
+            lines.append(
+                f"{r['dataset']} & {r['k']} & "
+                + " & ".join(
+                    [
+                        f"{fmt_dp(r[f'{label}_total_dp'])} & {fmt_dp(r[f'{label}_max_dp'])} & {fmt_s(r[f'{label}_sens'])}"
+                        f" & {fmt_rk(r[f'{label}_regret_per_k'])}"
+                        for _, label in mech_map
+                    ]
+                )
+                + r" \\"
+            )
+        if d_idx < len(dataset_order) - 1:
+            lines.append(r"\midrule")
     lines += [
         r"\bottomrule",
         r"\end{tabular}",
-        r"\caption{Baseline local sensitivity under a single-review one-tick perturbation, using the edit that maximally shifts the perturbed item's LOO interval representation. $\Delta p_{L1}$ is the induced L1 change in marginal selection probabilities; Sens. is local sensitivity ($\Delta p_{L1}$/input perturbation magnitude).}",
-        r"\label{tab:baseline_local_sensitivity}",
+        rf"\caption{{{caption}}}",
+        rf"\label{{{label}}}",
         r"\end{table}",
     ]
     with open(out_tex, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
+
+
+def write_baseline_tables_tex(summary: pd.DataFrame, fig_dir: str) -> List[str]:
+    """Write separate LaTeX tables for existing baselines and smooth mechanisms."""
+    base_mechs = [
+        ("MERIT", "MERIT"),
+        ("Swiss NSF", "Swiss NSF"),
+        ("Randomized Threshold", "Threshold"),
+    ]
+    smooth_mechs = [
+        ("Linear Lottery", "Linear Lottery"),
+        ("Softmax", "Softmax"),
+    ]
+    caption_common = (
+        "Local sensitivity under a single-review one-tick perturbation, using the edit that "
+        "maximally shifts the perturbed item's LOO interval representation. Total $\\Delta p$ "
+        "is the L1 change in the marginal probability vector, Max $\\Delta p$ is the maximum "
+        "coordinate change, Smoothness is local sensitivity ($\\Delta p_{L1}$/input perturbation magnitude), "
+        "and Regret$/k$ is expected regret normalized by $k$ on the unperturbed input."
+    )
+    out1 = os.path.join(fig_dir, "baseline_local_sensitivity_table_existing.tex")
+    out2 = os.path.join(fig_dir, "baseline_local_sensitivity_table_smooth.tex")
+    _write_table_block(
+        summary=summary,
+        mech_map=base_mechs,
+        caption=f"Existing baseline partial lotteries. {caption_common}",
+        label="tab:baseline_local_sensitivity_existing",
+        out_tex=out1,
+    )
+    _write_table_block(
+        summary=summary,
+        mech_map=smooth_mechs,
+        caption=f"Smooth mechanisms at $L=1/r$. {caption_common}",
+        label="tab:baseline_local_sensitivity_smooth",
+        out_tex=out2,
+    )
+    return [out1, out2]
 
 
 def run(args) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -254,6 +387,8 @@ def run(args) -> Tuple[pd.DataFrame, pd.DataFrame]:
     k_names = [x.strip() for x in args.k_names.split(",") if x.strip()]
     requested_mechanisms = parse_mechanisms(args.mechanisms)
     merit_requested = "MERIT" in requested_mechanisms
+    linear_requested = "Linear Lottery" in requested_mechanisms
+    softmax_requested = "Softmax" in requested_mechanisms
     merit_available = merit_requested
     if merit_requested:
         try:
@@ -279,7 +414,19 @@ def run(args) -> Tuple[pd.DataFrame, pd.DataFrame]:
             m_band = max(1, int(round(args.threshold_band_frac * k)))
             m_band = min(m_band, k, n - k) if (n - k) > 0 else 1
 
-            p0 = baseline_probs(X, intervals, x_mean, k=k, m_band=m_band, include_merit=merit_available)
+            p0 = baseline_probs(
+                X,
+                intervals,
+                x_mean,
+                k=k,
+                m_band=m_band,
+                L_smooth=l_ref,
+                softmax_samples=args.softmax_samples,
+                softmax_seed=args.seed + 100_000 + 1000 * i + k,
+                include_merit=merit_available,
+                include_linear=linear_requested,
+                include_softmax=False,
+            )
             base_cand = candidate_items(v, k=k, window=args.candidate_window)
             swiss_window = args.swiss_candidate_window
             swiss_cand = (
@@ -323,10 +470,33 @@ def run(args) -> Tuple[pd.DataFrame, pd.DataFrame]:
                             p1 = _run_merit(intervals_p, k)
                         else:
                             p1 = np.asarray(swiss_nsf_intervals(intervals_p, list(x_p), k), dtype=float)
-                    else:
+                    elif mech == "Randomized Threshold":
                         p1 = randomize_above_threshold(Xp, k=k, m=m_band)
+                    elif mech == "Linear Lottery":
+                        p1 = linear_lottery_mechanism(Xp, k=k, L=l_ref)
+                    elif mech == "Softmax":
+                        v0 = np.nanmean(X, axis=1)
+                        v1 = np.nanmean(Xp, axis=1)
+                        p0_soft, p1 = _softmax_paired_probs_from_utils(
+                            v0=v0,
+                            v1=v1,
+                            k=k,
+                            L=l_ref,
+                            D_v=1.0 / float(rmin),
+                            samples=args.softmax_samples,
+                            seed=args.seed + 200_000 + 10_000 * i + 100 * k + int(idx),
+                            reps=args.softmax_reps,
+                        )
+                        p0_mech = p0_soft
+                    else:
+                        raise ValueError(f"Unknown mechanism in loop: {mech}")
 
-                    l1 = float(np.abs(np.asarray(p1) - p0[mech]).sum())
+                    if mech == "Softmax":
+                        base_p = np.asarray(p0_mech)
+                    else:
+                        base_p = np.asarray(p0[mech])
+                    l1 = float(np.abs(np.asarray(p1) - base_p).sum())
+                    max_dp = float(np.max(np.abs(np.asarray(p1) - base_p)))
                     sens = l1 / d_in
                     rec = {
                         "dataset": dlabel,
@@ -342,7 +512,10 @@ def run(args) -> Tuple[pd.DataFrame, pd.DataFrame]:
                         "tick": float(tick),
                         "input_delta": float(d_in),
                         "l1_prob_change": float(l1),
+                        "max_prob_change": float(max_dp),
                         "local_sensitivity": float(sens),
+                        "expected_regret": float(expected_regret(v, base_p, k)),
+                        "expected_regret_per_k": float(expected_regret(v, base_p, k) / float(k)),
                         "interval_shift_score": float(edit["interval_shift_score"]),
                     }
                     if best is None or rec["local_sensitivity"] > best["local_sensitivity"]:
@@ -359,6 +532,9 @@ def run(args) -> Tuple[pd.DataFrame, pd.DataFrame]:
             local_sensitivity=("local_sensitivity", "max"),
             input_delta=("input_delta", "first"),
             l1_prob_change=("l1_prob_change", "first"),
+            max_prob_change=("max_prob_change", "first"),
+            expected_regret=("expected_regret", "first"),
+            expected_regret_per_k=("expected_regret_per_k", "first"),
             item_idx=("item_idx", "first"),
             review_col=("review_col", "first"),
             direction=("direction", "first"),
@@ -369,7 +545,7 @@ def run(args) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Deterministic worst-case local sensitivity for baseline mechanisms")
+    parser = argparse.ArgumentParser(description="Worst-case local sensitivity for existing baseline partial-lottery mechanisms")
     parser.add_argument("--k_names", default="k10pct,k33pct,k50pct")
     parser.add_argument("--interval_method", default="leave_one_out", choices=["leave_one_out", "gaussian_ci", "minmax"])
     parser.add_argument("--candidate_window", type=int, default=0)
@@ -378,9 +554,11 @@ if __name__ == "__main__":
     parser.add_argument("--threshold_band_frac", type=float, default=0.10)
     parser.add_argument(
         "--mechanisms",
-        default="MERIT,Swiss NSF,Randomized Threshold",
-        help="Comma-separated subset of: MERIT,Swiss NSF,Randomized Threshold",
+        default="MERIT,Swiss NSF,Randomized Threshold,Linear Lottery,Softmax",
+        help="Comma-separated subset of: MERIT,Swiss NSF,Randomized Threshold,Linear Lottery,Softmax",
     )
+    parser.add_argument("--softmax_samples", type=int, default=20000)
+    parser.add_argument("--softmax_reps", type=int, default=5)
     parser.add_argument("--seed", type=int, default=42)
 
     parser.add_argument("--beta_n", type=int, default=200)
@@ -399,11 +577,11 @@ if __name__ == "__main__":
     df, summary = run(args)
     out_csv = os.path.join(args.output_dir, "baseline_local_sensitivity.csv")
     out_summary = os.path.join(args.output_dir, "baseline_local_sensitivity_summary.csv")
-    out_tex = os.path.join(args.fig_dir, "baseline_local_sensitivity_table.tex")
     df.to_csv(out_csv, index=False)
     summary.to_csv(out_summary, index=False)
     if not summary.empty:
-        write_baseline_table_tex(summary, out_tex=out_tex)
-        print(f"Saved {out_tex}")
+        out_texs = write_baseline_tables_tex(summary, fig_dir=args.fig_dir)
+        for out_tex in out_texs:
+            print(f"Saved {out_tex}")
     print(f"Saved {out_csv}")
     print(f"Saved {out_summary}")
