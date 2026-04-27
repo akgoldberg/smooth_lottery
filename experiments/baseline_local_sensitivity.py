@@ -352,17 +352,99 @@ def _write_table_block(
         f.write("\n".join(lines) + "\n")
 
 
+def _write_smooth_table_from_local_sensitivity_summary(
+    local_summary: pd.DataFrame,
+    out_tex: str,
+) -> None:
+    """Write smooth table from local_sensitivity.py summary output.
+
+    Expected columns include:
+    - dataset, k_name, L, mechanism, l1_prob_change, ratio_to_L
+    - local_sensitivity or local_smoothness (legacy naming)
+    """
+    dataset_order = ["ICLR", "NeurIPS", "Swiss NSF", "Beta"]
+    k_order = ["k10pct", "k33pct", "k50pct"]
+    k_label = {"k10pct": "10\\%", "k33pct": "33\\%", "k50pct": "50\\%"}
+
+    s = local_summary.copy()
+    if "local_sensitivity" not in s.columns and "local_smoothness" in s.columns:
+        s = s.rename(columns={"local_smoothness": "local_sensitivity"})
+
+    # Prefer L=1.0 for a compact paper table if present; otherwise use max available L.
+    L_vals = sorted([float(x) for x in s["L"].dropna().unique().tolist()])
+    if not L_vals:
+        return
+    L_target = 1.0 if 1.0 in L_vals else max(L_vals)
+    s = s[np.isclose(s["L"], L_target)].copy()
+
+    mech_map = [("linear", "Linear Lottery"), ("softmax", "Softmax")]
+    colspec = "llr|" + "|".join(["rrr" for _ in mech_map])
+    lines = [
+        r"\begin{table}[t]",
+        r"\centering",
+        r"\small",
+        r"\setlength{\tabcolsep}{4pt}",
+        r"\begin{tabular}{" + colspec + "}",
+        r"\toprule",
+        r" & & & " + " & ".join([rf"\multicolumn{{3}}{{c}}{{{label}}}" for _, label in mech_map]) + r" \\",
+        r"Dataset & $k$ & $L$ & "
+        + " & ".join([r"Total $\Delta p$ & Local smoothness & Ratio/L" for _ in mech_map])
+        + r" \\",
+        r"\midrule",
+    ]
+
+    for d_idx, d in enumerate(dataset_order):
+        for k_name in k_order:
+            block = s[(s["dataset"] == d) & (s["k_name"] == k_name)]
+            row_vals = []
+            for src, _ in mech_map:
+                t = block[block["mechanism"] == src]
+                if len(t):
+                    row_vals.append(
+                        f"{float(t['l1_prob_change'].iloc[0]):.3f} & "
+                        f"{float(t['local_sensitivity'].iloc[0]):.2f} & "
+                        f"{float(t['ratio_to_L'].iloc[0]):.2f}"
+                    )
+                else:
+                    row_vals.append(r"- & - & -")
+            lines.append(
+                f"{d} & {k_label[k_name]} & {L_target:.1f} & " + " & ".join(row_vals) + r" \\"
+            )
+        if d_idx < len(dataset_order) - 1:
+            lines.append(r"\midrule")
+
+    lines += [
+        r"\bottomrule",
+        r"\end{tabular}",
+        (
+            r"\caption{Smooth-mechanism local sensitivity from the local_sensitivity experiment "
+            rf"(reported at $L={L_target:.1f}$). Total $\Delta p$ is the L1 change in marginal "
+            r"selection probabilities under the selected one-review perturbation; Local smoothness "
+            r"is $(\Delta p_{L1})/(\Delta X_{1,1})$; Ratio/L is local smoothness divided by target $L$.}"
+        ),
+        r"\label{tab:baseline_local_sensitivity_smooth}",
+        r"\end{table}",
+    ]
+    with open(out_tex, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def write_baseline_tables_tex(summary: pd.DataFrame, fig_dir: str) -> List[str]:
-    """Write separate LaTeX tables for existing baselines and smooth mechanisms."""
-    base_mechs = [
+    """Write LaTeX tables from whatever mechanisms are present in summary."""
+    canonical = [
         ("MERIT", "MERIT"),
         ("Swiss NSF", "Swiss NSF"),
         ("Randomized Threshold", "Threshold"),
+        ("Linear Lottery", "Linear Lottery"),
+        ("Softmax", "Softmax"),
     ]
+    present = set(summary["mechanism"].astype(str).unique())
+    all_mechs = [(src, dst) for src, dst in canonical if src in present]
     smooth_mechs = [
         ("Linear Lottery", "Linear Lottery"),
         ("Softmax", "Softmax"),
     ]
+    smooth_mechs = [(src, dst) for src, dst in smooth_mechs if src in present]
     caption_common = (
         "Local sensitivity under a single-review one-tick perturbation, using the edit that "
         "maximally shifts the perturbed item's LOO interval representation. Total $\\Delta p$ "
@@ -371,22 +453,37 @@ def write_baseline_tables_tex(summary: pd.DataFrame, fig_dir: str) -> List[str]:
         "and Regret$/k$ is expected regret normalized by $k$ on the unperturbed input."
     )
     out1 = os.path.join(fig_dir, "baseline_local_sensitivity_table_existing.tex")
-    out2 = os.path.join(fig_dir, "baseline_local_sensitivity_table_smooth.tex")
+    out_paths = [out1]
     _write_table_block(
         summary=summary,
-        mech_map=base_mechs,
-        caption=f"Existing baseline partial lotteries. {caption_common}",
+        mech_map=all_mechs,
+        caption=f"Baseline local sensitivity results for all mechanisms included in this run. {caption_common}",
         label="tab:baseline_local_sensitivity_existing",
         out_tex=out1,
     )
-    _write_table_block(
-        summary=summary,
-        mech_map=smooth_mechs,
-        caption=f"Smooth mechanisms at $L=1/r$. {caption_common}",
-        label="tab:baseline_local_sensitivity_smooth",
-        out_tex=out2,
-    )
-    return [out1, out2]
+    if smooth_mechs:
+        out2 = os.path.join(fig_dir, "baseline_local_sensitivity_table_smooth.tex")
+        _write_table_block(
+            summary=summary,
+            mech_map=smooth_mechs,
+            caption=f"Smooth mechanisms at $L=1/r$. {caption_common}",
+            label="tab:baseline_local_sensitivity_smooth",
+            out_tex=out2,
+        )
+        out_paths.append(out2)
+    else:
+        # If this run excluded smooth mechanisms, source the smooth table from
+        # the dedicated smooth local-sensitivity experiment outputs.
+        local_summary_path = os.path.join(
+            os.path.dirname(fig_dir), "results", "local_sensitivity_all_summary.csv"
+        )
+        if os.path.exists(local_summary_path):
+            out2 = os.path.join(fig_dir, "baseline_local_sensitivity_table_smooth.tex")
+            local_summary = pd.read_csv(local_summary_path)
+            if not local_summary.empty:
+                _write_smooth_table_from_local_sensitivity_summary(local_summary, out_tex=out2)
+                out_paths.append(out2)
+    return out_paths
 
 
 def run(args) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -557,8 +654,18 @@ if __name__ == "__main__":
     parser.add_argument("--k_names", default="k10pct,k33pct,k50pct")
     parser.add_argument("--interval_method", default="leave_one_out", choices=["leave_one_out", "gaussian_ci", "minmax"])
     parser.add_argument("--candidate_window", type=int, default=0)
-    parser.add_argument("--swiss_candidate_window", type=int, default=50)
-    parser.add_argument("--threshold_candidate_window", type=int, default=0)
+    parser.add_argument(
+        "--swiss_candidate_window",
+        type=int,
+        default=-1,
+        help="Item-window around k/k+1 for Swiss NSF candidates; -1 means all items (default).",
+    )
+    parser.add_argument(
+        "--threshold_candidate_window",
+        type=int,
+        default=-1,
+        help="Item-window around k/k+1 for Randomized Threshold candidates; -1 means all items (default).",
+    )
     parser.add_argument("--threshold_band_frac", type=float, default=0.10)
     parser.add_argument(
         "--mechanisms",

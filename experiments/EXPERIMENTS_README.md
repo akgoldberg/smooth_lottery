@@ -153,7 +153,9 @@ High-level setup:
 - Candidate search:
   - `MERIT`: focused around boundary (`k/k+1` by default).
   - `Swiss NSF` and `Randomized Threshold`: all items (`--swiss_candidate_window -1 --threshold_candidate_window -1`).
-- Outputs two LaTeX tables from the same summary: one for existing baselines and one for smooth mechanisms.
+- Outputs:
+  - `baseline_local_sensitivity_table_existing.tex`: all mechanisms present in this run's baseline summary.
+  - `baseline_local_sensitivity_table_smooth.tex`: smooth-mechanism table. If smooth mechanisms are not included in the baseline run, this table is sourced from `local_sensitivity_all_summary.csv` (the dedicated smooth local-sensitivity experiment).
 
 Run:
 ```bash
