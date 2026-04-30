@@ -7,6 +7,7 @@ Utility files:
 - `experiments/mechanisms.py`: unified mechanism wrappers (Linear Lottery, Softmax, MERIT, Swiss NSF, threshold/randomized baselines) and interval conversion helpers.
 - `experiments/utils.py`: shared normalization and dataset helpers.
 - `experiments/plot_results.py`: centralized plotting for regret/smoothness figures.
+- `experiments/equivalent_smoothness.py`: baseline regret compared with Linear Lottery at matched empirical smoothness.
 
 ## Run Main Suite
 ```bash
@@ -18,6 +19,7 @@ This runs:
 3. `experiments/smoothness.py` (empirical estimate of global smoothness)
 4. `experiments/local_sensitivity.py` (empirical estimate of single-item perturbation local sensitivity)
 5. `experiments/baseline_local_sensitivity.py` (existing baseline partial-lottery local sensitivity + table)
+6. Optional: `experiments/equivalent_smoothness.py` (matched-smoothness regret comparison)
 
 Expected runtime:
 - Full suite: typically ~45 to 70 minutes on a laptop CPU (dominated by local sensitivity + baseline local sensitivity MERIT runs).
@@ -172,3 +174,32 @@ Outputs:
 - `experiments/results/baseline_local_sensitivity_summary.csv`
 - `experiments/figures/baseline_local_sensitivity_table_existing.tex`
 - `experiments/figures/baseline_local_sensitivity_table_smooth.tex`
+
+## Equivalent Smoothness Comparison (`equivalent_smoothness.py`)
+Goal:
+- Compare `MERIT`, `Swiss NSF`, and `Randomized Threshold` against Linear Lottery at equivalent smoothness levels.
+- Since these existing mechanisms do not expose a theoretical target `L`, equivalence is empirical: use each baseline mechanism's measured local sensitivity from `baseline_local_sensitivity.py`, then run Linear Lottery with `L = baseline_local_sensitivity` on the same dataset/k instance.
+
+High-level setup:
+- Reuses `baseline_local_sensitivity_summary.csv` if present.
+- With `--rerun_baseline`, first regenerates baseline local sensitivity for `MERIT`, `Swiss NSF`, and `Randomized Threshold`.
+- Produces one matched point per fixed mechanism/dataset/k. To make a threshold regret/smoothness curve, sweep `--threshold_band_frac` in separate runs, preferably with distinct `--output_dir`/`--fig_dir` values so artifacts are not overwritten.
+
+Run using an existing baseline summary:
+```bash
+python experiments/equivalent_smoothness.py
+```
+
+Run and refresh the baseline summary first:
+```bash
+python experiments/equivalent_smoothness.py \
+  --rerun_baseline \
+  --swiss_candidate_window -1 \
+  --threshold_candidate_window -1
+```
+
+Outputs:
+- `experiments/results/equivalent_smoothness.csv`
+- `experiments/figures/equivalent_smoothness_k10pct.pdf`
+- `experiments/figures/equivalent_smoothness_k33pct.pdf`
+- `experiments/figures/equivalent_smoothness_k50pct.pdf`

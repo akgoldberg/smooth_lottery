@@ -18,7 +18,6 @@ sys.path.insert(0, _BASE)
 sys.path.insert(0, _BASELINES_ROOT)
 
 from smooth_lotteries import linear_lottery_smooth, softmax_topk_smooth
-from algorithm.merit import run_merit
 from algorithm.helpers import swiss_nsf as _swiss_nsf_intervals
 
 
@@ -113,6 +112,8 @@ def softmax_mechanism(X: np.ndarray, k: int, L: float,
 def merit_mechanism(X: np.ndarray, k: int,
                     interval_method: str = "leave_one_out") -> np.ndarray:
     """MERIT mechanism: X -> intervals -> run_merit."""
+    from algorithm.merit import run_merit
+
     intervals, _ = reviews_to_intervals(X, method=interval_method)
     p, _ = run_merit(intervals, k)
     return np.asarray(p)
