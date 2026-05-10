@@ -104,7 +104,7 @@ def plot_regret_vs_param(
         if param_name == "L":
             _set_decimal_log_ticks(ax, x)
     ax.set_xlabel(x_label if x_label is not None else
-                  ("Smoothness parameter $L$" if param_name == "L" else param_name),
+                  (r"$L$ (lower is smoother)" if param_name == "L" else param_name),
                   fontsize=AXIS_LABEL_SIZE)
     ax.set_ylabel("Regret", fontsize=AXIS_LABEL_SIZE)
     ax.tick_params(axis="both", labelsize=TICK_LABEL_SIZE)
@@ -192,7 +192,7 @@ def plot_regret_vs_param_sidebyside(
             if param_name == "L":
                 _set_decimal_log_ticks(ax, x)
         ax.set_xlabel(x_label if x_label is not None else
-                      ("Smoothness parameter $L$" if param_name == "L" else param_name),
+                      (r"$L$ (lower is smoother)" if param_name == "L" else param_name),
                       fontsize=AXIS_LABEL_SIZE)
         ax.tick_params(axis="both", labelsize=TICK_LABEL_SIZE)
         ax.set_title(subtitle)
@@ -211,9 +211,11 @@ def plot_regret_vs_param_sidebyside(
             axes[idx].set_ylabel(y_label, fontsize=AXIS_LABEL_SIZE)
     legend_handles = [
         Line2D([0], [0], color=COLORS["Linear Lottery"], marker=MARKERS["Linear Lottery"],
-               linestyle=LINE_STYLES["Linear Lottery"], label="Linear Lottery"),
+               linestyle=LINE_STYLES["Linear Lottery"], label="Linear Lottery",
+               markersize=16, linewidth=4.2),
         Line2D([0], [0], color=COLORS["Softmax"], marker=MARKERS["Softmax"],
-               linestyle=LINE_STYLES["Softmax"], label="Softmax"),
+               linestyle=LINE_STYLES["Softmax"], label="Softmax",
+               markersize=16, linewidth=4.2),
     ]
     fig.legend(
         handles=legend_handles,
@@ -232,6 +234,82 @@ def plot_regret_vs_param_sidebyside(
 
     if save_path:
         fig.savefig(save_path, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_regret_vs_param_compact_row(
+    results_list: list,
+    param_name: str,
+    subtitles: list,
+    save_path: str = None,
+    x_label: str = None,
+    y_label: str = "Regret",
+) -> None:
+    """Compact 1xN row plot for regret curves with square-ish panels."""
+    n_panels = len(results_list)
+    fig, axes = plt.subplots(
+        1,
+        n_panels,
+        figsize=(6.55 * n_panels, 7.55),
+        sharey=False,
+        constrained_layout=False,
+    )
+    if not isinstance(axes, np.ndarray):
+        axes = np.array([axes])
+    axes = axes.ravel().tolist()
+
+    for ax, results, subtitle in zip(axes, results_list, subtitles):
+        x = results[param_name]
+        ax.plot(
+            x,
+            results["regret_linear"],
+            f"{MARKERS['Linear Lottery']}{LINE_STYLES['Linear Lottery']}",
+            color=COLORS["Linear Lottery"],
+            label="Linear Lottery",
+            markersize=9.5,
+            linewidth=3.7,
+        )
+        ax.plot(
+            x,
+            results["regret_softmax"],
+            f"{MARKERS['Softmax']}{LINE_STYLES['Softmax']}",
+            color=COLORS["Softmax"],
+            label="Softmax",
+            markersize=9.5,
+            linewidth=3.7,
+        )
+        ax.set_xlabel(
+            x_label if x_label is not None else (r"$L$ (lower is smoother)" if param_name == "L" else param_name),
+            fontsize=30,
+            labelpad=10,
+        )
+        ax.set_title(subtitle, fontsize=31, pad=14)
+        ax.tick_params(axis="both", labelsize=22)
+        ax.set_ylim(bottom=0)
+        ax.grid(alpha=0.25, linestyle=":")
+        ax.set_box_aspect(1.0)
+
+    axes[0].set_ylabel(y_label, fontsize=30, labelpad=10)
+    legend_handles = [
+        Line2D([0], [0], color=COLORS["Linear Lottery"], marker=MARKERS["Linear Lottery"],
+               linestyle=LINE_STYLES["Linear Lottery"], label="Linear Lottery",
+               markersize=22, linewidth=5.0),
+        Line2D([0], [0], color=COLORS["Softmax"], marker=MARKERS["Softmax"],
+               linestyle=LINE_STYLES["Softmax"], label="Softmax",
+               markersize=22, linewidth=5.0),
+    ]
+    fig.legend(
+        handles=legend_handles,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.965),
+        ncol=2,
+        fontsize=28,
+        frameon=True,
+    )
+    fig.tight_layout(rect=[0.015, 0.0, 0.985, 0.76])
+
+    if save_path:
+        fig.savefig(save_path, bbox_inches="tight", pad_inches=0.02)
     plt.close(fig)
 
 
@@ -444,7 +522,7 @@ def plot_global_smoothness_2x1(
 
     Despite the historical name, this now renders a 1x2 layout.
     """
-    fig, axes = plt.subplots(1, 2, figsize=(11.2, 4.4), sharey=True, constrained_layout=True)
+    fig, axes = plt.subplots(1, 2, figsize=(18.4, 8.0), sharey=True, constrained_layout=False)
     mech_order = ["linear", "softmax"]
     mech_label = {"linear": "Linear Lottery", "softmax": "Softmax"}
     colors = ["#1f77b4", "#d62728", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b"]
@@ -467,33 +545,37 @@ def plot_global_smoothness_2x1(
                 color=colors[i % len(colors)],
                 linestyle=linestyles[i % len(linestyles)],
                 marker=markers[i % len(markers)],
-                linewidth=2.6,
-                markersize=7.5,
-                markeredgewidth=1.0,
+                linewidth=4.2,
+                markersize=12.5,
+                markeredgewidth=1.2,
                 label=f"k={k}",
             )
         if ykey == "ratio_empirical_to_targetL":
-            ax.axhline(1.0, linestyle="--", color="black", linewidth=1.2, alpha=0.8, label="_nolegend_")
+            ax.axhline(1.0, linestyle="--", color="black", linewidth=2.2, alpha=0.8, label="_nolegend_")
         else:
             maxv = max([max(float(r["L"]), float(r[ykey])) for r in mrows], default=1.0)
-            ax.plot([0, maxv * 1.05], [0, maxv * 1.05], linestyle="--", color="black", linewidth=1.2, alpha=0.8, label="_nolegend_")
-        ax.set_title(mech_label[mech])
-        ax.set_ylabel(ylabel)
+            ax.plot([0, maxv * 1.05], [0, maxv * 1.05], linestyle="--", color="black", linewidth=2.2, alpha=0.8, label="_nolegend_")
+        ax.set_title(mech_label[mech], fontsize=34, pad=18)
+        if ax is axes[0]:
+            ax.set_ylabel(ylabel, fontsize=30, labelpad=12)
         ax.grid(alpha=0.25, linestyle=":")
         ax.set_ylim(bottom=0)
+        ax.tick_params(axis="both", labelsize=24)
         if legend_handles is None:
             legend_handles, legend_labels = ax.get_legend_handles_labels()
     for ax in axes:
-        ax.set_xlabel("Target L")
+        ax.set_xlabel("Target L", fontsize=30, labelpad=10)
     if legend_handles:
         fig.legend(
             legend_handles,
             legend_labels,
-            loc="lower center",
-            bbox_to_anchor=(0.5, -0.03),
+            loc="upper center",
+            bbox_to_anchor=(0.5, 0.98),
             ncol=max(1, min(3, len(legend_labels))),
             frameon=True,
+            fontsize=28,
         )
+    fig.tight_layout(rect=[0.0, 0.0, 1.0, 0.82])
     # No figure title for paper-ready exports.
     fig.savefig(out_pdf, bbox_inches="tight", pad_inches=0.02)
     plt.close(fig)
