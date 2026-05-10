@@ -551,10 +551,10 @@ def plot_global_smoothness_2x1(
                 label=f"k={k}",
             )
         if ykey == "ratio_empirical_to_targetL":
-            ax.axhline(1.0, linestyle="--", color="black", linewidth=2.2, alpha=0.8, label="_nolegend_")
+            ax.axhline(1.0, linestyle="--", color="black", linewidth=2.2, alpha=0.8, label="Theoretical bound")
         else:
             maxv = max([max(float(r["L"]), float(r[ykey])) for r in mrows], default=1.0)
-            ax.plot([0, maxv * 1.05], [0, maxv * 1.05], linestyle="--", color="black", linewidth=2.2, alpha=0.8, label="_nolegend_")
+            ax.plot([0, maxv * 1.05], [0, maxv * 1.05], linestyle="--", color="black", linewidth=2.2, alpha=0.8, label="Theoretical bound")
         ax.set_title(mech_label[mech], fontsize=34, pad=18)
         if ax is axes[0]:
             ax.set_ylabel(ylabel, fontsize=30, labelpad=12)
@@ -571,7 +571,7 @@ def plot_global_smoothness_2x1(
             legend_labels,
             loc="upper center",
             bbox_to_anchor=(0.5, 0.98),
-            ncol=max(1, min(3, len(legend_labels))),
+            ncol=max(1, min(4, len(legend_labels))),
             frameon=True,
             fontsize=28,
         )

@@ -591,11 +591,19 @@ def plot_max_delta_p_rows(df: pd.DataFrame, fig_dir: str) -> List[str]:
     return out
 
 
-def plot_tradeoff_rows(matched_df: pd.DataFrame, curve_df: pd.DataFrame, fig_dir: str) -> List[str]:
+def plot_tradeoff_rows(
+    matched_df: pd.DataFrame,
+    curve_df: pd.DataFrame,
+    fig_dir: str,
+    k_names: List[str] = None,
+    show_legend: bool = True,
+    filename_prefix: str = "matched_regret_tradeoff",
+) -> List[str]:
     os.makedirs(fig_dir, exist_ok=True)
     out = []
     marker_map = {"MERIT": "o", "Swiss NSF": "s"}
-    for k_name in sorted(matched_df["k_name"].unique()):
+    plot_k_names = sorted(matched_df["k_name"].unique()) if k_names is None else k_names
+    for k_name in plot_k_names:
         dk = matched_df[matched_df["k_name"] == k_name].copy()
         ck = curve_df[curve_df["k_name"] == k_name].copy()
         dataset_order = [d for d in DEFAULT_DATASETS if d in set(dk["dataset"])]
@@ -670,7 +678,7 @@ def plot_tradeoff_rows(matched_df: pd.DataFrame, curve_df: pd.DataFrame, fig_dir
             if legend_handles is None:
                 legend_handles, legend_labels = ax.get_legend_handles_labels()
 
-        if legend_handles:
+        if show_legend and legend_handles:
             dedup = dict(zip(legend_labels, legend_handles))
             fig.legend(
                 dedup.values(),
@@ -681,8 +689,8 @@ def plot_tradeoff_rows(matched_df: pd.DataFrame, curve_df: pd.DataFrame, fig_dir
                 frameon=True,
                 fontsize=28,
             )
-        fig.tight_layout(rect=[0.0, 0.0, 1.0, 0.85])
-        out_pdf = os.path.join(fig_dir, f"matched_regret_tradeoff_{k_name}.pdf")
+        fig.tight_layout(rect=[0.0, 0.0, 1.0, 0.85 if show_legend else 0.97])
+        out_pdf = os.path.join(fig_dir, f"{filename_prefix}_{k_name}.pdf")
         fig.savefig(out_pdf, bbox_inches="tight", pad_inches=0.02)
         plt.close(fig)
         out.append(out_pdf)
